@@ -356,11 +356,85 @@ void DrawPlayerSetup(GameState *state) {
     }
 }
 
+
+//ajout chavlets
+void DrawPlayerChevalets(GameState *state) {
+    for (int p = 0; p < state->playerCount; p++) {
+        // Définir la zone du chevalet pour chaque joueur
+        Rectangle chevaletArea;
+        switch (p) {
+            case 0: // Joueur 1 (haut)
+                chevaletArea = (Rectangle){SCREEN_WIDTH / 2 - 150, 60, 300, 40};
+                break;
+            case 1: // Joueur 2 (bas)
+                chevaletArea = (Rectangle){SCREEN_WIDTH / 2 - 150, SCREEN_HEIGHT - 100, 300, 40};
+                break;
+            case 2: // Joueur 3 (gauche)
+                chevaletArea = (Rectangle){20, SCREEN_HEIGHT / 2 - 100, 40, 200};
+                break;
+            case 3: // Joueur 4 (droite)
+                chevaletArea = (Rectangle){SCREEN_WIDTH - 60, SCREEN_HEIGHT / 2 - 100, 40, 200};
+                break;
+        }
+
+        // Dessiner le chevalet
+        DrawRectangleRec(chevaletArea, CUSTOM_LIGHT_BLUE);
+        DrawRectangleLinesEx(chevaletArea, 2, CUSTOM_BEIGE);
+
+        // Placer les pièces sur le chevalet
+        if (state->selectedGame == 0) { // Dominos
+            for (int d = 0; d < state->players[p].dominoCount; d++) {
+                Domino currentDomino = state->players[p].playerDominos[d];
+                Vector2 position;
+
+                if (p < 2) { // Alignement horizontal
+                    position = (Vector2){
+                        chevaletArea.x + 10 + d * (DOMINO_WIDTH + 5),
+                        chevaletArea.y + chevaletArea.height / 2 - DOMINO_HEIGHT / 2
+                    };
+                } else { // Alignement vertical
+                    position = (Vector2){
+                        chevaletArea.x + chevaletArea.width / 2 - DOMINO_WIDTH / 2,
+                        chevaletArea.y + 10 + d * (DOMINO_HEIGHT + 5)
+                    };
+                }
+
+                currentDomino.position = position;
+                DrawDomino(currentDomino); // Affiche le domino à la bonne position
+            }
+        } else if (state->selectedGame == 1) { // Triominos
+            for (int t = 0; t < state->players[p].triominoCount; t++) {
+                Triomino currentTriomino = state->players[p].playerTriominos[t];
+                Vector2 position;
+
+                if (p < 2) { // Alignement horizontal
+                    position = (Vector2){
+                        chevaletArea.x + 10 + t * (TRIOMINO_WIDTH + 5),
+                        chevaletArea.y + chevaletArea.height / 2 - TRIOMINO_HEIGHT / 2
+                    };
+                } else { // Alignement vertical
+                    position = (Vector2){
+                        chevaletArea.x + chevaletArea.width / 2 - TRIOMINO_WIDTH / 2,
+                        chevaletArea.y + 10 + t * (TRIOMINO_HEIGHT + 5)
+                    };
+                }
+
+                currentTriomino.position = position;
+                DrawTriomino(currentTriomino); // Affiche le triomino à la bonne position
+            }
+        }
+    }
+}
+
+
 // ------------------------
 // Function to draw the game screen (Domino and Triomino)
 // ------------------------
 void DrawGameScreen(GameState *state) {
     // Screen background
+    //ajout des chvalets 
+    DrawPlayerChevalets(state);
+
     ClearBackground(state->selectedGame == 0 ? CUSTOM_GREEN : CUSTOM_LIGHT_BLUE);
     DrawRectangle(0, 0, SCREEN_WIDTH, 50, CUSTOM_DARK_BLUE); // Top bar
     DrawRectangle(0, SCREEN_HEIGHT - 50, SCREEN_WIDTH, 50, CUSTOM_DARK_BLUE); // Bottom bar
