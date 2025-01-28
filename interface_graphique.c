@@ -11,8 +11,8 @@
 #include <time.h>
 
 // Define constants
-#define SCREEN_WIDTH 1024
-#define SCREEN_HEIGHT 768
+#define SCREEN_WIDTH GetScreenWidth()
+#define SCREEN_HEIGHT GetScreenHeight()
 
 // Function prototypes
 void InitGameState(GameState *state);
@@ -31,8 +31,10 @@ int main(void) {
     srand(time(NULL));
 
     // Initialize window
-    InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Dominos & Triominos");
+    InitWindow(GetScreenWidth(), GetScreenHeight(), "Dominos & Triominos");
+    ToggleFullscreen();
     SetTargetFPS(60);
+
 
     // Initialize game state
     GameState gameState;
