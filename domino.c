@@ -71,7 +71,8 @@ void DrawDominoFace(float x, float y, int value, float width, float height) {
 // Function to draw a domino
 void DrawDomino(Domino domino) {
     float halfWidth = DOMINO_WIDTH / 2.0f;
-    float halfHeight = DOMINO_HEIGHT / 2.0f;
+    
+    // Rest of the function remains the same...
     
     // Draw the white background of the domino
     DrawRectangle(domino.position.x, domino.position.y, DOMINO_WIDTH, DOMINO_HEIGHT, WHITE_COLOR);

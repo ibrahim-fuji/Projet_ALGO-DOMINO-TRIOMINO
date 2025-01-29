@@ -46,7 +46,6 @@ void DrawTriominoNumber(float x, float y, int value, int faceIndex) {
     char number[2];
     sprintf(number, "%d", value);
     float centerX = x + TRIOMINO_WIDTH / 2;
-    float centerY = y + TRIOMINO_HEIGHT / 2;
 
     switch(faceIndex) {
         case 0: // Face supérieure (haut)
