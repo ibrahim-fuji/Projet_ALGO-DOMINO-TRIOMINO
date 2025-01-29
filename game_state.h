@@ -1,4 +1,3 @@
-// game_state.h
 #ifndef GAME_STATE_H
 #define GAME_STATE_H
 
@@ -6,41 +5,51 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
-// Définition des constantes pour les dimensions des dominos et triominos
-#define DOMINO_WIDTH 100
-#define DOMINO_HEIGHT 50
-
+// Définition des constantes pour les dimensions
+#define DOMINO_WIDTH 50
+#define DOMINO_HEIGHT 40
 #define TRIOMINO_WIDTH 60
 #define TRIOMINO_HEIGHT 52
 #define TRIOMINO_DOT_RADIUS 3
-
-#define DOTS_RADIUS 5
-
+#define DOTS_RADIUS 3
 #define MAX_INPUT_LENGTH 20
 #define MAX_PLAYERS 4
 #define PANEL_PADDING 20
 
+// Structure pour le chevalet
+typedef struct {
+    Rectangle bounds;
+    Color color;
+} Chevalet;
+
 // Structure pour représenter un domino
 typedef struct {
-    int top;            // Valeur de la face supérieure
-    int bottom;         // Valeur de la face inférieure
-    Vector2 position;   // Position sur l'écran
-    float rotation;     // Rotation en degrés
+    int top;
+    int bottom;
+    Vector2 position;
+    float rotation;
 } Domino;
 
-// Forward declaration de Triomino
-typedef struct Triomino Triomino;
+// Structure pour un triomino
+typedef struct {
+    int values[3];
+    Vector2 position;
+    float rotation;
+    bool isRotating;
+    float rotationSpeed;
+} Triomino;
 
 // Structure pour représenter un joueur
 typedef struct {
     char name[MAX_INPUT_LENGTH];
     int score;
     bool isAI;
-    Domino playerDominos[7];      // Maximum 7 dominos par joueur
+    Domino playerDominos[7];
     int dominoCount;
-    Triomino *playerTriominos;    // Tableau dynamique de triominos
+    Triomino *playerTriominos;
     int triominoCount;
     int triominoCapacity;
+    Chevalet chevalet;
 } Player;
 
 // Enumération des différents écrans du jeu
@@ -60,10 +69,19 @@ typedef struct {
     int playerCount;
     Player players[MAX_PLAYERS];
     bool isGameStarted;
-    int selectedGame;      // 0 = Dominos, 1 = Triominos
-    int editingPlayer;     // Index du joueur en cours d'édition (-1 si aucun)
-    int currentPlayer;     // Joueur actuel
-    Triomino* selectedTriomino; // Triomino actuellement sélectionné
+    int selectedGame;
+    int editingPlayer;
+    int currentPlayer;
+    Triomino* selectedTriomino;
+    int screenWidth;
+    int screenHeight;
+    bool isFullscreen;
 } GameState;
+
+// Fonctions de calcul des dimensions adaptatives
+float GetDominoWidth(GameState *state);
+float GetDominoHeight(GameState *state);
+float GetTriominoWidth(GameState *state);
+float GetTriominoHeight(GameState *state);
 
 #endif // GAME_STATE_H
