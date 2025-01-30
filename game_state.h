@@ -4,6 +4,8 @@
 #include "raylib.h"
 #include <stdbool.h>
 #include <stdlib.h>
+#include "do.h" 
+#include "joueurs.h"
 
 // Définition des constantes pour les dimensions
 #define DOMINO_WIDTH 50
@@ -23,12 +25,7 @@ typedef struct {
 } Chevalet;
 
 // Structure pour représenter un domino
-typedef struct {
-    int top;
-    int bottom;
-    Vector2 position;
-    float rotation;
-} Domino;
+
 
 // Structure pour un triomino
 typedef struct {
@@ -76,6 +73,8 @@ typedef struct {
     int screenWidth;
     int screenHeight;
     bool isFullscreen;
+    Plateau *plateau;
+    Domino *selectedDomino;
 } GameState;
 
 // Fonctions de calcul des dimensions adaptatives

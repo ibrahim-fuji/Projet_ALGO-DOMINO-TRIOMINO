@@ -1,5 +1,6 @@
 // domino.c
 #include "domino.h"
+#include "game_state.h"
 #include <math.h>
 
 // Function to draw a custom button and handle interactions
@@ -85,6 +86,6 @@ void DrawDomino(Domino domino) {
     DrawRectangleLines(domino.position.x, domino.position.y, DOMINO_WIDTH, DOMINO_HEIGHT, BLACK_TEXT);
     
     // Draw the dots
-    DrawDominoFace(domino.position.x, domino.position.y, domino.top, halfWidth, DOMINO_HEIGHT);
-    DrawDominoFace(domino.position.x + halfWidth, domino.position.y, domino.bottom, halfWidth, DOMINO_HEIGHT);
+    DrawDominoFace(domino.position.x, domino.position.y, domino.v_gauche, halfWidth, DOMINO_HEIGHT);
+    DrawDominoFace(domino.position.x + halfWidth, domino.position.y, domino.v_droite, halfWidth, DOMINO_HEIGHT);
 }

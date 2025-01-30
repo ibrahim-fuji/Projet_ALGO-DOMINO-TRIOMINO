@@ -3,6 +3,8 @@
 #include "raymath.h"
 #include "triomino.h"
 #include "domino.h"
+#include "do.h" 
+#include "joueurs.h"
 #include "game_state.h"
 #include <stdio.h>
 #include <string.h>
@@ -27,6 +29,7 @@ void DrawGameScreen(GameState *state);
 void DrawScores(GameState *state);
 void HandleInput(GameState *state);
 void HandlePlayerInput(GameState *state);
+void DrawDominoPlateau(GameState *state);
 void DrawDominoInChevalet(GameState *state, int playerIndex, int dominoIndex);
 void DrawTriominoInChevalet(GameState *state, int playerIndex, int triominoIndex);
 void InitGamePieces(GameState *state);
@@ -273,10 +276,21 @@ void DrawGameScreen(GameState *state) {
             }
         }
     }
+    
+    DrawDominoPlateau(state);
 
-    Button playButton = {
-        .rect = {state->screenWidth/2 - 160, state->screenHeight - 45, 150, 40},
-        .text = "JOUER",
+    Button playButtonGauche = {
+        .rect = {state->screenWidth/2 - 350, state->screenHeight - 45, 150, 40},
+        .text = "GAUCHE",
+        .baseColor = CUSTOM_GREEN,
+        .hoverColor = CUSTOM_LIGHT_BLUE,
+        .textColor = CUSTOM_BEIGE,
+        .isHovered = false
+    };
+    
+    Button playButtonDroite = {
+        .rect = {state->screenWidth/2 - 180, state->screenHeight - 45, 150, 40},
+        .text = "DROITE",
         .baseColor = CUSTOM_GREEN,
         .hoverColor = CUSTOM_LIGHT_BLUE,
         .textColor = CUSTOM_BEIGE,
@@ -292,12 +306,47 @@ void DrawGameScreen(GameState *state) {
         .isHovered = false
     };
 
-    DrawButtonCustom(&playButton);
+    DrawButtonCustom(&playButtonGauche);
+    DrawButtonCustom(&playButtonDroite);
+
     DrawButtonCustom(&passButton);
 
     DrawText(TextFormat("Tour de %s", state->players[state->currentPlayer].name),
              state->screenWidth - 200, 15, 20, CUSTOM_BEIGE);
 }
+
+void DrawDominoPlateau(GameState *state) {
+    // Commencer au début de la liste
+    Plateau *pointeurPlateau = state->plateau;
+
+    // Dimensions du domino
+    float dominoWidth = DOMINO_WIDTH;  // Largeur d'un domino
+    float dominoHeight = DOMINO_HEIGHT; // Hauteur d'un domino
+
+    // Calculer la position pour centrer le premier domino
+    float startX = (state->screenWidth - dominoWidth) / 2;  // Centrer horizontalement
+    float startY = (state->screenHeight - dominoHeight) / 2; // Centrer verticalement
+
+    // Parcourir la liste jusqu'à la fin
+    while (pointeurPlateau != NULL) {
+        // Récupérer le domino actuel
+        Domino *domino = &pointeurPlateau->domino;
+
+        // Mettre à jour la position du domino pour le centrer
+        domino->position = (Vector2){startX, startY};
+
+        // Dessiner le domino
+        DrawDomino(*domino);
+
+        // Décaler la position pour le domino suivant (par exemple, vers la droite)
+        startX += dominoWidth + 10; // Ajouter un espace de 10 pixels entre les dominos
+
+        // Passer au domino suivant dans la liste
+        pointeurPlateau = pointeurPlateau->suivant;
+    }
+}
+
+
 
 void DrawDominoInChevalet(GameState *state, int playerIndex, int dominoIndex) {
     Player *player = &state->players[playerIndex];
@@ -399,7 +448,7 @@ void DrawGameSelection(GameState *state, Texture2D dominoImage, Texture2D triomi
     if (CheckCollisionPointRec(mousePoint, dominoRect) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
         state->selectedGame = 0;
         state->currentScreen = PLAYER_SETUP;
-        InitGamePieces(state);
+        
     }
     if (CheckCollisionPointRec(mousePoint, triominoRect) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
         state->selectedGame = 1;
@@ -408,6 +457,7 @@ void DrawGameSelection(GameState *state, Texture2D dominoImage, Texture2D triomi
     }
 }
 void HandlePlayerInput(GameState *state) {
+	bool isDominoChosen = false;
     if (state->currentScreen == PLAYER_SETUP && state->editingPlayer >= 0) {
         // Gestion de l'édition des noms des joueurs
         int key = GetCharPressed();
@@ -463,17 +513,27 @@ void HandlePlayerInput(GameState *state) {
                         };
                         
                         if (CheckCollisionPointRec(mousePoint, dominoRect)) {
-                            // Logique de sélection du domino
-                            // À implémenter selon les besoins
-                            break;
+                            // Sélection du domino si aucun domino n'est déjà sélectionné
+                            if (state->selectedDomino == NULL) {
+                                state->selectedDomino = domino;
+                                printf("Domino sélectionné : [%d | %d]\n", domino->v_gauche, domino->v_droite);
+                            } else {
+                                // Désélectionner le domino si on clique à nouveau dessus
+                                if (state->selectedDomino == domino) {
+                                    state->selectedDomino = NULL;
+                                    printf("Domino désélectionné\n");
+                                }
+                            }
+                            break;  // Sortir de la boucle après avoir sélectionné un domino
                         }
                     }
                 } else {  // Triominos
                     for (int t = 0; t < currentPlayer->triominoCount; t++) {
                         Triomino *triomino = &currentPlayer->playerTriominos[t];
                         if (IsPointInTriomino(mousePoint, *triomino)) {
-                            // Logique de sélection du triomino
-                            // À implémenter selon les besoins
+                            // Sélection du triomino
+                            state->selectedTriomino = triomino;
+                            printf("Triomino sélectionné !\n");
                             break;
                         }
                     }
@@ -482,17 +542,28 @@ void HandlePlayerInput(GameState *state) {
         }
 
         // Gestion des boutons de jeu
-        Rectangle playButtonRect = {state->screenWidth/2 - 160, state->screenHeight - 45, 150, 40};
-        Rectangle passButtonRect = {state->screenWidth/2 + 10, state->screenHeight - 45, 150, 40};
+        Rectangle playButtonGaucheRect = {state->screenWidth / 2 - 350, state->screenHeight - 45, 150, 40};
+        Rectangle playButtonDroiteRect = {state->screenWidth / 2 - 180, state->screenHeight - 45, 150, 40};
+        Rectangle passButtonRect = {state->screenWidth / 2 + 10, state->screenHeight - 45, 150, 40};
 
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-            if (CheckCollisionPointRec(mousePoint, playButtonRect)) {
-                // Logique pour jouer une pièce
-                // À implémenter selon les besoins
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && state->selectedDomino != NULL) {
+            if (CheckCollisionPointRec(mousePoint, playButtonGaucheRect)) {
+                // Placer le domino à gauche
+                placerDomino_Gauche(*state->selectedDomino, &state->plateau);
+                printf("Domino placé à gauche !\n");
+                state->selectedDomino = NULL;  // Réinitialisation après placement
+            }
+            else if (CheckCollisionPointRec(mousePoint, playButtonDroiteRect)) {
+                // Placer le domino à droite
+                placerDomino_Droite(*state->selectedDomino, &state->plateau);
+                printf("Domino placé à droite !\n");
+                state->selectedDomino = NULL;  // Réinitialisation après placement
             }
             else if (CheckCollisionPointRec(mousePoint, passButtonRect)) {
                 // Passer au joueur suivant
+                printf("Tour terminé. Joueur suivant.\n");
                 state->currentPlayer = (state->currentPlayer + 1) % state->playerCount;
+                state->selectedDomino = NULL;  // Désélectionner le domino
             }
         }
     }
@@ -628,6 +699,7 @@ void DrawPlayerSetup(GameState *state) {
         state->isGameStarted = true;
         state->editingPlayer = -1;
         state->inputText[0] = '\0';
+        InitGamePieces(state);
     }
 }
 
@@ -680,12 +752,14 @@ void HandleInput(GameState *state) {
 }
 
 void InitGamePieces(GameState *state) {
+	state->plateau = initialiserPlateau();
+	
     for (int p = 0; p < state->playerCount; p++) {
         if (state->selectedGame == 0) {
             state->players[p].dominoCount = 7;
             for (int d = 0; d < state->players[p].dominoCount; d++) {
-                state->players[p].playerDominos[d].top = rand() % 7;
-                state->players[p].playerDominos[d].bottom = rand() % 7;
+                state->players[p].playerDominos[d].v_gauche = rand() % 7;
+                state->players[p].playerDominos[d].v_droite = rand() % 7;
                 state->players[p].playerDominos[d].position = (Vector2){0, 0};
                 state->players[p].playerDominos[d].rotation = 90.0f;
             }
@@ -707,4 +781,6 @@ void InitGamePieces(GameState *state) {
             }
         }
     }
+
+
 }
