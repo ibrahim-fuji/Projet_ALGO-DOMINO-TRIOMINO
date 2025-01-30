@@ -32,6 +32,7 @@ void HandlePlayerInput(GameState *state);
 void DrawDominoPlateau(GameState *state);
 void DrawDominoInChevalet(GameState *state, int playerIndex, int dominoIndex);
 void DrawTriominoInChevalet(GameState *state, int playerIndex, int triominoIndex);
+Domino tournerDomino(Domino domino);
 void InitGamePieces(GameState *state);
 
 int main(void) {
@@ -305,11 +306,21 @@ void DrawGameScreen(GameState *state) {
         .textColor = CUSTOM_BEIGE,
         .isHovered = false
     };
+    
+    Button tournerButton = {
+        .rect = {state->screenWidth/2 + 200, state->screenHeight - 45, 150, 40},
+        .text = "TOURNER",
+        .baseColor = CUSTOM_RED,
+        .hoverColor = DARKRED,
+        .textColor = CUSTOM_BEIGE,
+        .isHovered = false
+    };
 
     DrawButtonCustom(&playButtonGauche);
     DrawButtonCustom(&playButtonDroite);
 
     DrawButtonCustom(&passButton);
+    DrawButtonCustom(&tournerButton);
 
     DrawText(TextFormat("Tour de %s", state->players[state->currentPlayer].name),
              state->screenWidth - 200, 15, 20, CUSTOM_BEIGE);
@@ -367,7 +378,7 @@ void DrawDominoInChevalet(GameState *state, int playerIndex, int dominoIndex) {
         // Joueurs en haut et en bas (dominos verticaux)
         float startX = player->chevalet.bounds.x + 10;
         domino->position = (Vector2){
-            startX + (dominoIndex * (dominoWidth + spacing)),
+            startX + (dominoIndex * (dominoWidth + spacing +20)),
             player->chevalet.bounds.y + (player->chevalet.bounds.height - dominoHeight)/2
         };
         domino->rotation = 90.0f;
@@ -545,8 +556,15 @@ void HandlePlayerInput(GameState *state) {
         Rectangle playButtonGaucheRect = {state->screenWidth / 2 - 350, state->screenHeight - 45, 150, 40};
         Rectangle playButtonDroiteRect = {state->screenWidth / 2 - 180, state->screenHeight - 45, 150, 40};
         Rectangle passButtonRect = {state->screenWidth / 2 + 10, state->screenHeight - 45, 150, 40};
+        Rectangle tournerButtonRect = {state->screenWidth/2 + 200, state->screenHeight - 45, 150, 40};
 
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && state->selectedDomino != NULL) {
+			if(CheckCollisionPointRec(mousePoint, tournerButtonRect))
+			{
+				printf("%d\n", state->selectedDomino->v_droite);
+				*state->selectedDomino = tournerDomino(*state->selectedDomino);
+				printf("%d\n", state->selectedDomino->v_droite);
+			}
 				if (CheckCollisionPointRec(mousePoint, playButtonGaucheRect)) {
 				if (verificationPlacement(*state->selectedDomino, state->plateau, true)) {
 					placerDomino_Gauche(*state->selectedDomino, &state->plateau);
@@ -565,11 +583,13 @@ void HandlePlayerInput(GameState *state) {
 				}
 				state->selectedDomino = NULL;
 			}
+			
 			else if (CheckCollisionPointRec(mousePoint, passButtonRect)) {
 				printf("Tour terminé. Joueur suivant.\n");
 				state->currentPlayer = (state->currentPlayer + 1) % state->playerCount;
 				state->selectedDomino = NULL;
 				}
+			
         }
     }
 }
@@ -754,6 +774,14 @@ void HandleInput(GameState *state) {
             state->currentScreen = MENU;
         }
     }
+}
+Domino tournerDomino(Domino domino)
+{
+	int temp = domino.v_droite;
+	domino.v_droite = domino.v_gauche;
+	domino.v_gauche = temp;
+	domino.rotation = 180.0f;
+	return domino;
 }
 
 void InitGamePieces(GameState *state) {
