@@ -516,12 +516,12 @@ void HandlePlayerInput(GameState *state) {
                             // Sélection du domino si aucun domino n'est déjà sélectionné
                             if (state->selectedDomino == NULL) {
                                 state->selectedDomino = domino;
-                                printf("Domino sélectionné : [%d | %d]\n", domino->v_gauche, domino->v_droite);
+                                printf("Domino selectionne : %d, %d\n", domino->v_gauche, domino->v_droite);
                             } else {
                                 // Désélectionner le domino si on clique à nouveau dessus
                                 if (state->selectedDomino == domino) {
                                     state->selectedDomino = NULL;
-                                    printf("Domino désélectionné\n");
+                                    printf("Domino deselectionne\n");
                                 }
                             }
                             break;  // Sortir de la boucle après avoir sélectionné un domino
@@ -547,24 +547,29 @@ void HandlePlayerInput(GameState *state) {
         Rectangle passButtonRect = {state->screenWidth / 2 + 10, state->screenHeight - 45, 150, 40};
 
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && state->selectedDomino != NULL) {
-            if (CheckCollisionPointRec(mousePoint, playButtonGaucheRect)) {
-                // Placer le domino à gauche
-                placerDomino_Gauche(*state->selectedDomino, &state->plateau);
-                printf("Domino placé à gauche !\n");
-                state->selectedDomino = NULL;  // Réinitialisation après placement
-            }
-            else if (CheckCollisionPointRec(mousePoint, playButtonDroiteRect)) {
-                // Placer le domino à droite
-                placerDomino_Droite(*state->selectedDomino, &state->plateau);
-                printf("Domino placé à droite !\n");
-                state->selectedDomino = NULL;  // Réinitialisation après placement
-            }
-            else if (CheckCollisionPointRec(mousePoint, passButtonRect)) {
-                // Passer au joueur suivant
-                printf("Tour terminé. Joueur suivant.\n");
-                state->currentPlayer = (state->currentPlayer + 1) % state->playerCount;
-                state->selectedDomino = NULL;  // Désélectionner le domino
-            }
+				if (CheckCollisionPointRec(mousePoint, playButtonGaucheRect)) {
+				if (verificationPlacement(*state->selectedDomino, state->plateau, true)) {
+					placerDomino_Gauche(*state->selectedDomino, &state->plateau);
+					state->currentPlayer = (state->currentPlayer + 1) % state->playerCount;
+				} else {
+					printf("Placement invalide à gauche !\n");
+				}
+				state->selectedDomino = NULL;  // Désélectionner après le placement
+			}
+			else if (CheckCollisionPointRec(mousePoint, playButtonDroiteRect)) {
+				if (verificationPlacement(*state->selectedDomino, state->plateau, false)) {
+					placerDomino_Droite(*state->selectedDomino, &state->plateau);
+					state->currentPlayer = (state->currentPlayer + 1) % state->playerCount;
+				} else {
+					printf("Placement invalide à droite !\n");
+				}
+				state->selectedDomino = NULL;
+			}
+			else if (CheckCollisionPointRec(mousePoint, passButtonRect)) {
+				printf("Tour terminé. Joueur suivant.\n");
+				state->currentPlayer = (state->currentPlayer + 1) % state->playerCount;
+				state->selectedDomino = NULL;
+				}
         }
     }
 }
@@ -753,7 +758,6 @@ void HandleInput(GameState *state) {
 
 void InitGamePieces(GameState *state) {
 	state->plateau = initialiserPlateau();
-	
     for (int p = 0; p < state->playerCount; p++) {
         if (state->selectedGame == 0) {
             state->players[p].dominoCount = 7;
