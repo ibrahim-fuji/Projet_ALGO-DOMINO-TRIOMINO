@@ -2,6 +2,8 @@
 #define GAME_STATE_H
 
 #include "raylib.h"
+#include "do.h"
+#include "joueurs.h"
 #include <stdbool.h>
 #include <stdlib.h>
 
@@ -22,14 +24,6 @@ typedef struct {
     Color color;
 } Chevalet;
 
-// Structure pour représenter un domino
-typedef struct {
-    int top;
-    int bottom;
-    Vector2 position;
-    float rotation;
-} Domino;
-
 // Structure pour un triomino
 typedef struct {
     int values[3];
@@ -44,7 +38,7 @@ typedef struct {
     char name[MAX_INPUT_LENGTH];
     int score;
     bool isAI;
-    Domino playerDominos[7];
+    Domino playerDominos[28];
     int dominoCount;
     Triomino *playerTriominos;
     int triominoCount;
@@ -64,6 +58,7 @@ typedef enum {
 
 // Structure de l'état du jeu
 typedef struct {
+	DominoNode* pioche;
     GameScreen currentScreen;
     char inputText[MAX_INPUT_LENGTH];
     int playerCount;

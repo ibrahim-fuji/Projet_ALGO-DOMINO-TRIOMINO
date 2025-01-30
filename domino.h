@@ -5,6 +5,7 @@
 #include "game_state.h"    // Inclure game_state.h pour les définitions des structures et constantes
 #include "raymath.h"       // Inclusion nécessaire pour les fonctions Vector2
 #include "triomino.h"      // Inclusion du module Triomino
+#include "do.h"
 
 // Définition des couleurs personnalisées
 #define CUSTOM_BLUE        (Color){0, 70, 140, 255}

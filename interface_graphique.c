@@ -3,6 +3,8 @@
 #include "raymath.h"
 #include "triomino.h"
 #include "domino.h"
+#include "do.h"
+#include "joueurs.h"
 #include "game_state.h"
 #include <stdio.h>
 #include <string.h>
@@ -101,6 +103,7 @@ int main(void) {
 
 void InitGameState(GameState *state) {
     state->currentScreen = MENU;
+    state->pioche = NULL;
     state->playerCount = 0;
     state->isGameStarted = false;
     state->selectedGame = -1;
@@ -164,197 +167,6 @@ void DrawMainMenu(GameState *state) {
     if (DrawButtonCustom(&scoresButton)) state->currentScreen = SCORES;
     if (DrawButtonCustom(&exitButton)) CloseWindow();
 }
-
-void DrawGameScreen(GameState *state) {
-    ClearBackground(state->selectedGame == 0 ? CUSTOM_GREEN : CUSTOM_LIGHT_BLUE);
-    DrawRectangle(0, 0, state->screenWidth, 50, CUSTOM_DARK_BLUE);
-    DrawRectangle(0, state->screenHeight - 50, state->screenWidth, 50, CUSTOM_DARK_BLUE);
-
-    Button menuButton = {
-        .rect = {10, 10, 100, 30},
-        .text = "MENU",
-        .baseColor = CUSTOM_RED,
-        .hoverColor = DARKRED,
-        .textColor = CUSTOM_BEIGE,
-        .isHovered = false
-    };
-
-    if (DrawButtonCustom(&menuButton)) {
-        state->currentScreen = MENU;
-    }
-
-    const char* gameTitle = (state->selectedGame == 0) ? "DOMINOS" : "TRIOMINOS";
-    DrawText(gameTitle, state->screenWidth/2 - MeasureText(gameTitle, 30)/2, 10, 30, CUSTOM_BEIGE);
-
-    Rectangle playArea = {50, 100, state->screenWidth - 100, state->screenHeight - 200};
-    DrawRectangleRec(playArea, state->selectedGame == 0 ? CUSTOM_GREEN : CUSTOM_LIGHT_BLUE);
-    DrawRectangleLinesEx(playArea, 2, CUSTOM_BEIGE);
-
-    for (int i = 0; i < state->playerCount; i++) {
-        Color chevaletColor = (Color){50, 50, 50, 200};
-        Rectangle chevaletBounds;
-        Vector2 textPos;
-
-        switch(i) {
-            case 0:
-                chevaletBounds = (Rectangle){
-                    state->screenWidth/2 - CHEVALET_H_WIDTH/2,
-                    60,
-                    CHEVALET_H_WIDTH,
-                    CHEVALET_H_HEIGHT
-                };
-                textPos = (Vector2){
-                    chevaletBounds.x,
-                    chevaletBounds.y - 25
-                };
-                DrawRectangle(textPos.x - 2, textPos.y - 2, 300, 24, (Color){0, 0, 0, 150});
-                break;
-
-            case 1:
-                chevaletBounds = (Rectangle){
-                    state->screenWidth/2 - CHEVALET_H_WIDTH/2,
-                    state->screenHeight - CHEVALET_H_HEIGHT - 60,
-                    CHEVALET_H_WIDTH,
-                    CHEVALET_H_HEIGHT
-                };
-                textPos = (Vector2){
-                    chevaletBounds.x,
-                    chevaletBounds.y - 25
-                };
-                DrawRectangle(textPos.x - 2, textPos.y - 2, 300, 24, (Color){0, 0, 0, 150});
-                break;
-
-            case 2:
-                chevaletBounds = (Rectangle){
-                    20,
-                    state->screenHeight/2 - CHEVALET_V_HEIGHT/2,
-                    CHEVALET_V_WIDTH,
-                    CHEVALET_V_HEIGHT
-                };
-                textPos = (Vector2){
-                    chevaletBounds.x,
-                    chevaletBounds.y - 30
-                };
-                DrawRectangle(textPos.x - 2, textPos.y - 2, 300, 24, (Color){0, 0, 0, 150});
-                break;
-
-            case 3:
-                chevaletBounds = (Rectangle){
-                    state->screenWidth - CHEVALET_V_WIDTH - 20,
-                    state->screenHeight/2 - CHEVALET_V_HEIGHT/2,
-                    CHEVALET_V_WIDTH,
-                    CHEVALET_V_HEIGHT
-                };
-                textPos = (Vector2){
-                    state->screenWidth - 320,
-                    chevaletBounds.y - 30
-                };
-                DrawRectangle(textPos.x - 2, textPos.y - 2, 300, 24, (Color){0, 0, 0, 150});
-                break;
-        }
-
-        state->players[i].chevalet.bounds = chevaletBounds;
-        state->players[i].chevalet.color = chevaletColor;
-
-        DrawRectangleRec(chevaletBounds, chevaletColor);
-        DrawRectangleLinesEx(chevaletBounds, 2, CUSTOM_BEIGE);
-
-        char playerInfo[100];
-        sprintf(playerInfo, "J%d: %s - Score: %d", i+1, state->players[i].name, state->players[i].score);
-        DrawText(playerInfo, textPos.x, textPos.y, 20, CUSTOM_BEIGE);
-
-        if (state->selectedGame == 0) {
-            for (int d = 0; d < state->players[i].dominoCount; d++) {
-                DrawDominoInChevalet(state, i, d);
-            }
-        } else {
-            for (int t = 0; t < state->players[i].triominoCount; t++) {
-                DrawTriominoInChevalet(state, i, t);
-            }
-        }
-    }
-
-    Button playButton = {
-        .rect = {state->screenWidth/2 - 160, state->screenHeight - 45, 150, 40},
-        .text = "JOUER",
-        .baseColor = CUSTOM_GREEN,
-        .hoverColor = CUSTOM_LIGHT_BLUE,
-        .textColor = CUSTOM_BEIGE,
-        .isHovered = false
-    };
-
-    Button passButton = {
-        .rect = {state->screenWidth/2 + 10, state->screenHeight - 45, 150, 40},
-        .text = "PASSER",
-        .baseColor = CUSTOM_RED,
-        .hoverColor = DARKRED,
-        .textColor = CUSTOM_BEIGE,
-        .isHovered = false
-    };
-
-    DrawButtonCustom(&playButton);
-    DrawButtonCustom(&passButton);
-
-    DrawText(TextFormat("Tour de %s", state->players[state->currentPlayer].name),
-             state->screenWidth - 200, 15, 20, CUSTOM_BEIGE);
-}
-
-void DrawDominoInChevalet(GameState *state, int playerIndex, int dominoIndex) {
-    Player *player = &state->players[playerIndex];
-    Domino *domino = &player->playerDominos[dominoIndex];
-    float spacing = 5.0f;
-    float dominoWidth = 40.0f;    // Largeur d'un domino
-    float dominoHeight = 80.0f;   // Hauteur d'un domino
-    
-    if (playerIndex == 2 || playerIndex == 3) {
-        // Joueurs sur les côtés (dominos horizontaux)
-        float startY = player->chevalet.bounds.y + 10;
-        domino->position = (Vector2){
-            player->chevalet.bounds.x + (player->chevalet.bounds.width - dominoWidth)/2,
-            startY + (dominoIndex * (dominoHeight + spacing))
-        };
-        domino->rotation = 0.0f;
-    } else {
-        // Joueurs en haut et en bas (dominos verticaux)
-        float startX = player->chevalet.bounds.x + 10;
-        domino->position = (Vector2){
-            startX + (dominoIndex * (dominoWidth + spacing)),
-            player->chevalet.bounds.y + (player->chevalet.bounds.height - dominoHeight)/2
-        };
-        domino->rotation = 90.0f;
-    }
-    
-    DrawDomino(*domino);
-}
-
-void DrawTriominoInChevalet(GameState *state, int playerIndex, int triominoIndex) {
-    Player *player = &state->players[playerIndex];
-    Triomino *triomino = &player->playerTriominos[triominoIndex];
-    float spacing = 5.0f;
-    float triominoWidth = 60.0f;  // Largeur d'un triomino
-    float triominoHeight = 52.0f; // Hauteur d'un triomino
-    
-    if (playerIndex == 2 || playerIndex == 3) {
-        // Joueurs sur les côtés (triominos verticaux)
-        float startY = player->chevalet.bounds.y + 10;
-        triomino->position = (Vector2){
-            player->chevalet.bounds.x + (player->chevalet.bounds.width - triominoWidth)/2,
-            startY + (triominoIndex * (triominoHeight + spacing))
-        };
-        triomino->rotation = 0.0f; // Rotation pour orientation verticale
-    } else {
-        // Joueurs en haut et en bas (triominos verticaux)
-        float startX = player->chevalet.bounds.x + 10;
-        triomino->position = (Vector2){
-            startX + (triominoIndex * (triominoWidth + spacing)),
-            player->chevalet.bounds.y + (player->chevalet.bounds.height - triominoHeight)/2
-        };
-        triomino->rotation = 0.0f; // Rotation pour orientation verticale
-    }
-    
-    DrawTriomino(*triomino);
-}
-
 void DrawGameSelection(GameState *state, Texture2D dominoImage, Texture2D triominoImage) {
     ClearBackground(RAYWHITE);
     DrawText("CHOISISSEZ VOTRE JEU", 
@@ -399,7 +211,6 @@ void DrawGameSelection(GameState *state, Texture2D dominoImage, Texture2D triomi
     if (CheckCollisionPointRec(mousePoint, dominoRect) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
         state->selectedGame = 0;
         state->currentScreen = PLAYER_SETUP;
-        InitGamePieces(state);
     }
     if (CheckCollisionPointRec(mousePoint, triominoRect) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
         state->selectedGame = 1;
@@ -444,14 +255,13 @@ void HandlePlayerInput(GameState *state) {
     else if (state->currentScreen == GAME_DOMINO || state->currentScreen == GAME_TRIOMINO) {
         Vector2 mousePoint = GetMousePosition();
 
-        // Gestion des pièces du joueur actuel
-        if (state->currentPlayer >= 0 && state->currentPlayer < state->playerCount) {
-            Player *currentPlayer = &state->players[state->currentPlayer];
+//		Gestion des pièces du joueur actuel
+        if (state->currentPlayer >= 0 && state->currentPlayer <= state->playerCount) {
+            Player *currentPlayer = &state->players[state->currentPlayer - 1];
 
             // Vérifier si le clic est dans le chevalet du joueur actuel
             if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && 
                 CheckCollisionPointRec(mousePoint, currentPlayer->chevalet.bounds)) {
-                
                 if (state->selectedGame == 0) {  // Dominos
                     for (int d = 0; d < currentPlayer->dominoCount; d++) {
                         Domino *domino = &currentPlayer->playerDominos[d];
@@ -465,8 +275,9 @@ void HandlePlayerInput(GameState *state) {
                         if (CheckCollisionPointRec(mousePoint, dominoRect)) {
                             // Logique de sélection du domino
                             // À implémenter selon les besoins
-                            break;
-                        }
+                            //supprimerDomino(&state->players[state->currentPlayer].playerDominos, d, &state->players->dominoCount);
+                            printf("le domino %d est supprime\n", domino->v_droite);
+                    	}
                     }
                 } else {  // Triominos
                     for (int t = 0; t < currentPlayer->triominoCount; t++) {
@@ -487,12 +298,11 @@ void HandlePlayerInput(GameState *state) {
 
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
             if (CheckCollisionPointRec(mousePoint, playButtonRect)) {
-                // Logique pour jouer une pièce
+                // Logique pour jouer une pièce et passer au joueur suivant
                 // À implémenter selon les besoins
             }
             else if (CheckCollisionPointRec(mousePoint, passButtonRect)) {
                 // Passer au joueur suivant
-                state->currentPlayer = (state->currentPlayer + 1) % state->playerCount;
             }
         }
     }
@@ -628,6 +438,7 @@ void DrawPlayerSetup(GameState *state) {
         state->isGameStarted = true;
         state->editingPlayer = -1;
         state->inputText[0] = '\0';
+        InitGamePieces(state);
     }
 }
 
@@ -679,16 +490,270 @@ void HandleInput(GameState *state) {
     }
 }
 
-void InitGamePieces(GameState *state) {
-    for (int p = 0; p < state->playerCount; p++) {
+void DrawGameScreen(GameState *state) {
+    ClearBackground(state->selectedGame == 0 ? CUSTOM_GREEN : CUSTOM_LIGHT_BLUE);
+    DrawRectangle(0, 0, state->screenWidth, 50, CUSTOM_DARK_BLUE);
+    DrawRectangle(0, state->screenHeight - 50, state->screenWidth, 50, CUSTOM_DARK_BLUE);
+
+    Button menuButton = {
+        .rect = {10, 10, 100, 30},
+        .text = "MENU",
+        .baseColor = CUSTOM_RED,
+        .hoverColor = DARKRED,
+        .textColor = CUSTOM_BEIGE,
+        .isHovered = false
+    };
+
+    if (DrawButtonCustom(&menuButton)) {
+        state->currentScreen = MENU;
+    }
+
+    const char* gameTitle = (state->selectedGame == 0) ? "DOMINOS" : "TRIOMINOS";
+    DrawText(gameTitle, state->screenWidth/2 - MeasureText(gameTitle, 30)/2, 10, 30, CUSTOM_BEIGE);
+
+    Rectangle playArea = {50, 100, state->screenWidth - 100, state->screenHeight - 200};
+    DrawRectangleRec(playArea, state->selectedGame == 0 ? CUSTOM_GREEN : CUSTOM_LIGHT_BLUE);
+    DrawRectangleLinesEx(playArea, 2, CUSTOM_BEIGE);
+
+    for (int i = 0; i < state->playerCount; i++) {
+        Color chevaletColor = (Color){50, 50, 50, 200};
+        Rectangle chevaletBounds;
+        Vector2 textPos;
+
+        switch(i) {
+            case 0:
+                chevaletBounds = (Rectangle){
+                    state->screenWidth/2 - CHEVALET_H_WIDTH/2,
+                    60,
+                    CHEVALET_H_WIDTH,
+                    CHEVALET_H_HEIGHT
+                };
+                textPos = (Vector2){
+                    chevaletBounds.x,
+                    chevaletBounds.y - 25
+                };
+                DrawRectangle(textPos.x - 2, textPos.y - 2, 300, 24, (Color){0, 0, 0, 150});
+                break;
+
+            case 1:
+                chevaletBounds = (Rectangle){
+                    state->screenWidth/2 - CHEVALET_H_WIDTH/2,
+                    state->screenHeight - CHEVALET_H_HEIGHT - 60,
+                    CHEVALET_H_WIDTH,
+                    CHEVALET_H_HEIGHT
+                };
+                textPos = (Vector2){
+                    chevaletBounds.x,
+                    chevaletBounds.y - 25
+                };
+                DrawRectangle(textPos.x - 2, textPos.y - 2, 300, 24, (Color){0, 0, 0, 150});
+                break;
+
+            case 2:
+                chevaletBounds = (Rectangle){
+                    20,
+                    state->screenHeight/2 - CHEVALET_V_HEIGHT/2,
+                    CHEVALET_V_WIDTH,
+                    CHEVALET_V_HEIGHT
+                };
+                textPos = (Vector2){
+                    chevaletBounds.x,
+                    chevaletBounds.y - 30
+                };
+                DrawRectangle(textPos.x - 2, textPos.y - 2, 300, 24, (Color){0, 0, 0, 150});
+                break;
+
+            case 3:
+                chevaletBounds = (Rectangle){
+                    state->screenWidth - CHEVALET_V_WIDTH - 20,
+                    state->screenHeight/2 - CHEVALET_V_HEIGHT/2,
+                    CHEVALET_V_WIDTH,
+                    CHEVALET_V_HEIGHT
+                };
+                textPos = (Vector2){
+                    state->screenWidth - 320,
+                    chevaletBounds.y - 30
+                };
+                DrawRectangle(textPos.x - 2, textPos.y - 2, 300, 24, (Color){0, 0, 0, 150});
+                break;
+        }
+
+        state->players[i].chevalet.bounds = chevaletBounds;
+        state->players[i].chevalet.color = chevaletColor;
+
+        DrawRectangleRec(chevaletBounds, chevaletColor);
+        DrawRectangleLinesEx(chevaletBounds, 2, CUSTOM_BEIGE);
+
+        char playerInfo[100];
+        sprintf(playerInfo, "J%d: %s - Score: %d", i+1, state->players[i].name, state->players[i].score);
+        DrawText(playerInfo, textPos.x, textPos.y, 20, CUSTOM_BEIGE);
+
         if (state->selectedGame == 0) {
-            state->players[p].dominoCount = 7;
+            for (int d = 0; d < state->players[i].dominoCount; d++) {
+                DrawDominoInChevalet(state, i, d);
+            }
+        } else {
+            for (int t = 0; t < state->players[i].triominoCount; t++) {
+                DrawTriominoInChevalet(state, i, t);
+            }
+        }
+    }
+
+    Button playButton = {
+        .rect = {state->screenWidth/2 - 160, state->screenHeight - 45, 150, 40},
+        .text = "JOUER",
+        .baseColor = CUSTOM_GREEN,
+        .hoverColor = CUSTOM_LIGHT_BLUE,
+        .textColor = CUSTOM_BEIGE,
+        .isHovered = false
+    };
+
+    Button piocherButton = {
+        .rect = {state->screenWidth/2 + 10, state->screenHeight - 45, 150, 40},
+        .text = "PIOCHER",
+        .baseColor = CUSTOM_RED,
+        .hoverColor = DARKRED,
+        .textColor = CUSTOM_BEIGE,
+        .isHovered = false
+    };
+
+    DrawButtonCustom(&playButton);
+    if (DrawButtonCustom(&piocherButton)){
+    	if (state->pioche != NULL){
+	    	switch (state->currentPlayer) {
+	    		case 1:    			
+					state->players[0].playerDominos[state->players[0].dominoCount].v_gauche = state->pioche->domino_current.v_gauche;
+					state->players[0].playerDominos[state->players[0].dominoCount].v_droite = state->pioche->domino_current.v_droite;
+					state->players[0].playerDominos[state->players[0].dominoCount].position = (Vector2){0, 0};
+	                state->players[0].playerDominos[state->players[0].dominoCount].rotation = 90.0f;
+	                state->pioche = state->pioche->domino_suivant;
+	                DrawDominoInChevalet(state, 0, state->players[0].dominoCount-1);
+	                state->players[0].dominoCount++;
+	                state->currentPlayer = 2;
+	                break;
+	            case 2:
+					state->players[1].playerDominos[state->players[1].dominoCount].v_gauche = state->pioche->domino_current.v_gauche;
+					state->players[1].playerDominos[state->players[1].dominoCount].v_droite = state->pioche->domino_current.v_droite;
+					state->players[1].playerDominos[state->players[1].dominoCount].position = (Vector2){0, 0};
+	                state->players[1].playerDominos[state->players[1].dominoCount].rotation = 90.0f;
+	                state->pioche = state->pioche->domino_suivant;
+	                DrawDominoInChevalet(state, 1, state->players[1].dominoCount-1);
+	                state->players[1].dominoCount++;
+		           	state->currentPlayer = (state->playerCount == 2) ?  1 : 3;
+	            	break;
+				case 3:
+					state->players[2].playerDominos[state->players[2].dominoCount].v_gauche = state->pioche->domino_current.v_gauche;
+					state->players[2].playerDominos[state->players[2].dominoCount].v_droite = state->pioche->domino_current.v_droite;
+					state->players[2].playerDominos[state->players[2].dominoCount].position = (Vector2){0, 0};
+	                state->players[2].playerDominos[state->players[2].dominoCount].rotation = 90.0f;
+	                state->pioche = state->pioche->domino_suivant;
+	                DrawDominoInChevalet(state, 2, state->players[2].dominoCount-1);
+	                state->players[2].dominoCount++;
+					state->currentPlayer = (state->playerCount == 3) ?  1 : 4;
+					break;	
+				case 4:
+					state->players[3].playerDominos[state->players[3].dominoCount].v_gauche = state->pioche->domino_current.v_gauche;
+					state->players[3].playerDominos[state->players[3].dominoCount].v_droite = state->pioche->domino_current.v_droite;
+					state->players[3].playerDominos[state->players[3].dominoCount].position = (Vector2){0, 0};
+	                state->players[3].playerDominos[state->players[3].dominoCount].rotation = 90.0f;
+	                state->pioche = state->pioche->domino_suivant;
+	                DrawDominoInChevalet(state, 3, state->players[3].dominoCount-1);
+	                state->players[3].dominoCount++;
+					state->currentPlayer = 1;
+					break;
+	    	}
+		}
+		else {
+			printf("Erreur : Pioche vide.\n");
+		}
+	}
+
+    DrawText(TextFormat("Tour de %s", state->players[state->currentPlayer - 1].name),
+    state->screenWidth - 200, 15, 20, CUSTOM_BEIGE);
+}
+
+void DrawDominoInChevalet(GameState *state, int playerIndex, int dominoIndex) {
+    Player *player = &state->players[playerIndex];
+    Domino *domino = &player->playerDominos[dominoIndex];
+    float spacing = 10.0f;
+    float dominoWidth = 40.0f;    // Largeur d'un domino
+    float dominoHeight = 80.0f;   // Hauteur d'un domino
+    
+    if (playerIndex == 2 || playerIndex == 3) {
+        // Joueurs sur les côtés (dominos horizontaux)
+        float startY = player->chevalet.bounds.y + 10;
+        domino->position = (Vector2){
+            player->chevalet.bounds.x + (player->chevalet.bounds.width - dominoWidth)/2,
+            startY + (dominoIndex * (dominoHeight + spacing))
+        };
+        domino->rotation = 0.0f;
+    } else {
+        // Joueurs en haut et en bas (dominos verticaux)
+        float startX = player->chevalet.bounds.x + 10;
+        domino->position = (Vector2){
+            startX + (dominoIndex * (dominoWidth + spacing)),
+            player->chevalet.bounds.y + (player->chevalet.bounds.height - dominoHeight)/2
+        };
+        domino->rotation = 90.0f;
+    }
+    
+    DrawDomino(*domino);
+}
+
+void DrawTriominoInChevalet(GameState *state, int playerIndex, int triominoIndex) {
+    Player *player = &state->players[playerIndex];
+    Triomino *triomino = &player->playerTriominos[triominoIndex];
+    float spacing = 5.0f;
+    float triominoWidth = 60.0f;  // Largeur d'un triomino
+    float triominoHeight = 52.0f; // Hauteur d'un triomino
+    
+    if (playerIndex == 2 || playerIndex == 3) {
+        // Joueurs sur les côtés (triominos verticaux)
+        float startY = player->chevalet.bounds.y + 10;
+        triomino->position = (Vector2){
+            player->chevalet.bounds.x + (player->chevalet.bounds.width - triominoWidth)/2,
+            startY + (triominoIndex * (triominoHeight + spacing))
+        };
+        triomino->rotation = 0.0f; // Rotation pour orientation verticale
+    } else {
+        // Joueurs en haut et en bas (triominos verticaux)
+        float startX = player->chevalet.bounds.x + 10;
+        triomino->position = (Vector2){
+            startX + (triominoIndex * (triominoWidth + spacing)),
+            player->chevalet.bounds.y + (player->chevalet.bounds.height - triominoHeight)/2
+        };
+        triomino->rotation = 0.0f; // Rotation pour orientation verticale
+    }
+    
+    DrawTriomino(*triomino);
+}
+
+
+
+void InitGamePieces(GameState *state) {
+	
+	state->currentPlayer = 1;
+	state->pioche = initialiserDomino();
+    melange_pioche(&state->pioche);
+    printf("la pioche au debut :\n");
+    afficherDomino(state->pioche);
+
+    for (int p = 0; p < state->playerCount; p++) {
+    	state->players[p].dominoCount = (state->playerCount == 2) ? 7 : 6;
+        if (state->selectedGame == 0) {
             for (int d = 0; d < state->players[p].dominoCount; d++) {
-                state->players[p].playerDominos[d].top = rand() % 7;
-                state->players[p].playerDominos[d].bottom = rand() % 7;
+            	if (state->pioche == NULL) {
+                    printf("Erreur : Pioche vide avant distribution compl�te.\n");
+                    return;
+                }
+                state->players[p].playerDominos[d].v_gauche = state->pioche->domino_current.v_gauche;
+                state->players[p].playerDominos[d].v_droite = state->pioche->domino_current.v_droite;
                 state->players[p].playerDominos[d].position = (Vector2){0, 0};
                 state->players[p].playerDominos[d].rotation = 90.0f;
-            }
+                state->pioche = state->pioche->domino_suivant;
+                printf("(%d|", state->players[p].playerDominos[d].v_gauche);
+                printf("%d)\n", state->players[p].playerDominos[d].v_droite);
+			}
         } else {
             state->players[p].triominoCount = 7;
             for (int t = 0; t < state->players[p].triominoCount; t++) {
@@ -707,4 +772,6 @@ void InitGamePieces(GameState *state) {
             }
         }
     }
+	printf("la pioche en fin :\n");
+	afficherDomino(state->pioche);
 }
