@@ -32,19 +32,21 @@ void HandlePlayerInput(GameState *state);
 void DrawDominoPlateau(GameState *state);
 void DrawDominoInChevalet(GameState *state, int playerIndex, int dominoIndex);
 void DrawTriominoInChevalet(GameState *state, int playerIndex, int triominoIndex);
-Domino tournerDomino(Domino domino);
 void InitGamePieces(GameState *state);
+void HandleTriominoTurn(GameState *state);
+void UpdateGame(GameState *state);
 
 int main(void) {
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(1024, 768, "Dominos & Triominos");
     SetTargetFPS(60);
 
-    srand(time(NULL));
+    printf("Fenêtre initialisée\n");
 
     GameState gameState;
     InitGameState(&gameState);
 
+    // Load textures
     Texture2D dominoImage = LoadTexture("resources/domino.png");
     Texture2D triominoImage = LoadTexture("resources/triomino.png");
 
@@ -54,25 +56,21 @@ int main(void) {
         return -1;
     }
 
+    printf("Début de la boucle de jeu\n");
+
     while (!WindowShouldClose()) {
         gameState.screenWidth = GetScreenWidth();
         gameState.screenHeight = GetScreenHeight();
-
-        if (IsKeyPressed(KEY_F11)) {
-            if (!gameState.isFullscreen) {
-                SetWindowState(FLAG_FULLSCREEN_MODE);
-                gameState.isFullscreen = true;
-            } else {
-                ClearWindowState(FLAG_FULLSCREEN_MODE);
-                gameState.isFullscreen = false;
-            }
-        }
+        gameState.deltaTime = GetFrameTime();
 
         HandleInput(&gameState);
         HandlePlayerInput(&gameState);
+        UpdateGame(&gameState);
 
         BeginDrawing();
+        {
             ClearBackground(RAYWHITE);
+            
             switch (gameState.currentScreen) {
                 case MENU:
                     DrawMainMenu(&gameState);
@@ -91,11 +89,15 @@ int main(void) {
                     DrawScores(&gameState);
                     break;
             }
+        }
         EndDrawing();
     }
 
+    // Cleanup
     for (int i = 0; i < MAX_PLAYERS; i++) {
-        free(gameState.players[i].playerTriominos);
+        if (gameState.players[i].playerTriominos != NULL) {
+            free(gameState.players[i].playerTriominos);
+        }
     }
     UnloadTexture(dominoImage);
     UnloadTexture(triominoImage);
@@ -278,7 +280,11 @@ void DrawGameScreen(GameState *state) {
         }
     }
     
-    DrawDominoPlateau(state);
+    if (state->selectedGame == 0) {
+        DrawDominoPlateau(state);
+    } else {
+        DrawTriominoPlateau(state);
+    }
 
     Button playButtonGauche = {
         .rect = {state->screenWidth/2 - 350, state->screenHeight - 45, 150, 40},
@@ -298,15 +304,6 @@ void DrawGameScreen(GameState *state) {
         .isHovered = false
     };
 
-    Button passButton = {
-        .rect = {state->screenWidth/2 + 10, state->screenHeight - 45, 150, 40},
-        .text = "PASSER",
-        .baseColor = CUSTOM_RED,
-        .hoverColor = DARKRED,
-        .textColor = CUSTOM_BEIGE,
-        .isHovered = false
-    };
-    
     Button tournerButton = {
         .rect = {state->screenWidth/2 + 200, state->screenHeight - 45, 150, 40},
         .text = "TOURNER",
@@ -316,48 +313,102 @@ void DrawGameScreen(GameState *state) {
         .isHovered = false
     };
 
+    Button passButton = {
+        .rect = {state->screenWidth/2 + 10, state->screenHeight - 45, 150, 40},
+        .text = "PASSER",
+        .baseColor = CUSTOM_RED,
+        .hoverColor = DARKRED,
+        .textColor = CUSTOM_BEIGE,
+        .isHovered = false
+    };
+
     DrawButtonCustom(&playButtonGauche);
     DrawButtonCustom(&playButtonDroite);
-
-    DrawButtonCustom(&passButton);
     DrawButtonCustom(&tournerButton);
+    DrawButtonCustom(&passButton);
 
     DrawText(TextFormat("Tour de %s", state->players[state->currentPlayer].name),
              state->screenWidth - 200, 15, 20, CUSTOM_BEIGE);
-}
 
-void DrawDominoPlateau(GameState *state) {
-    // Commencer au début de la liste
-    Plateau *pointeurPlateau = state->plateau;
+    if (state->selectedGame == 1) {  // Pour le jeu de Triominos
+        // Dessiner le plateau de triominos
+        for (int i = 0; i < state->board.count; i++) {
+            DrawTriomino(state->board.pieces[i]);
+        }
 
-    // Dimensions du domino
-    float dominoWidth = DOMINO_WIDTH;  // Largeur d'un domino
-    float dominoHeight = DOMINO_HEIGHT; // Hauteur d'un domino
+        // Dessiner les boutons spécifiques aux triominos
+        Button rotateButton = {
+            .rect = {state->screenWidth/2 + 170, state->screenHeight - 45, 150, 40},
+            .text = "TOURNER",
+            .baseColor = CUSTOM_BLUE,
+            .hoverColor = CUSTOM_LIGHT_BLUE,
+            .textColor = CUSTOM_BEIGE,
+            .isHovered = false
+        };
 
-    // Calculer la position pour centrer le premier domino
-    float startX = (state->screenWidth - dominoWidth) / 2;  // Centrer horizontalement
-    float startY = (state->screenHeight - dominoHeight) / 2; // Centrer verticalement
+        Button piocherButton = {
+            .rect = {state->screenWidth/2 + 330, state->screenHeight - 45, 150, 40},
+            .text = "PIOCHER",
+            .baseColor = CUSTOM_GREEN,
+            .hoverColor = CUSTOM_LIGHT_BLUE,
+            .textColor = CUSTOM_BEIGE,
+            .isHovered = false
+        };
 
-    // Parcourir la liste jusqu'à la fin
-    while (pointeurPlateau != NULL) {
-        // Récupérer le domino actuel
-        Domino *domino = &pointeurPlateau->domino;
+        // Désactiver le bouton de pioche si plus de 3 pioches consécutives
+        if (state->consecutivePasses >= 3) {
+            piocherButton.baseColor = LIGHTGRAY;
+            piocherButton.hoverColor = LIGHTGRAY;
+        }
 
-        // Mettre à jour la position du domino pour le centrer
-        domino->position = (Vector2){startX, startY};
+        DrawButtonCustom(&rotateButton);
+        DrawButtonCustom(&piocherButton);
+    }
 
-        // Dessiner le domino
-        DrawDomino(*domino);
-
-        // Décaler la position pour le domino suivant (par exemple, vers la droite)
-        startX += dominoWidth + 10; // Ajouter un espace de 10 pixels entre les dominos
-
-        // Passer au domino suivant dans la liste
-        pointeurPlateau = pointeurPlateau->suivant;
+    // Ajouter le bouton de pioche pour les dominos
+    if (state->selectedGame == 0) { // Pour le jeu de dominos
+        Button piocherButton = {
+            .rect = {state->screenWidth/2 + 330, state->screenHeight - 45, 150, 40},
+            .text = "PIOCHER",
+            .baseColor = CUSTOM_GREEN,
+            .hoverColor = CUSTOM_LIGHT_BLUE,
+            .textColor = CUSTOM_BEIGE,
+            .isHovered = false
+        };
+        DrawButtonCustom(&piocherButton);
     }
 }
 
+void DrawDominoPlateau(GameState *state) {
+    Rectangle playArea = {50, 100, state->screenWidth - 100, state->screenHeight - 200};
+    Vector2 center = {playArea.x + playArea.width/2, playArea.y + playArea.height/2};
+    
+    if (!state->plateau) return;
 
+    Plateau* current = state->plateau;
+    float currentX = center.x;
+    float currentY = center.y;
+    float spacing = DOMINO_WIDTH + 5;
+
+    while (current) {
+        current->domino.position = (Vector2){currentX, currentY};
+        DrawDomino(current->domino);
+        currentX += spacing;
+        current = current->suivant;
+    }
+}
+
+void DrawTriominoPlateau(GameState *state) {
+    if (state->board.count == 0) return;
+
+    // Mettre à jour les positions du plateau
+    UpdateTriominoPositions(state);
+    
+    // Dessiner tous les triominos placés
+    for (int i = 0; i < state->board.count; i++) {
+        DrawTriomino(state->board.pieces[i]);
+    }
+}
 
 void DrawDominoInChevalet(GameState *state, int playerIndex, int dominoIndex) {
     Player *player = &state->players[playerIndex];
@@ -378,7 +429,7 @@ void DrawDominoInChevalet(GameState *state, int playerIndex, int dominoIndex) {
         // Joueurs en haut et en bas (dominos verticaux)
         float startX = player->chevalet.bounds.x + 10;
         domino->position = (Vector2){
-            startX + (dominoIndex * (dominoWidth + spacing +20)),
+            startX + (dominoIndex * (dominoWidth + spacing + 20)),
             player->chevalet.bounds.y + (player->chevalet.bounds.height - dominoHeight)/2
         };
         domino->rotation = 90.0f;
@@ -468,7 +519,11 @@ void DrawGameSelection(GameState *state, Texture2D dominoImage, Texture2D triomi
     }
 }
 void HandlePlayerInput(GameState *state) {
-	bool isDominoChosen = false;
+    // Ignorer les entrées pendant le tour de l'IA
+    if (state->currentScreen == GAME_DOMINO && state->players[state->currentPlayer].isAI) {
+        return;
+    }
+    
     if (state->currentScreen == PLAYER_SETUP && state->editingPlayer >= 0) {
         // Gestion de l'édition des noms des joueurs
         int key = GetCharPressed();
@@ -527,12 +582,12 @@ void HandlePlayerInput(GameState *state) {
                             // Sélection du domino si aucun domino n'est déjà sélectionné
                             if (state->selectedDomino == NULL) {
                                 state->selectedDomino = domino;
-                                printf("Domino selectionne : %d, %d\n", domino->v_gauche, domino->v_droite);
+                                printf("Domino sélectionné : [%d | %d]\n", domino->v_gauche, domino->v_droite);
                             } else {
                                 // Désélectionner le domino si on clique à nouveau dessus
                                 if (state->selectedDomino == domino) {
                                     state->selectedDomino = NULL;
-                                    printf("Domino deselectionne\n");
+                                    printf("Domino désélectionné\n");
                                 }
                             }
                             break;  // Sortir de la boucle après avoir sélectionné un domino
@@ -555,44 +610,145 @@ void HandlePlayerInput(GameState *state) {
         // Gestion des boutons de jeu
         Rectangle playButtonGaucheRect = {state->screenWidth / 2 - 350, state->screenHeight - 45, 150, 40};
         Rectangle playButtonDroiteRect = {state->screenWidth / 2 - 180, state->screenHeight - 45, 150, 40};
-        Rectangle passButtonRect = {state->screenWidth / 2 + 10, state->screenHeight - 45, 150, 40};
         Rectangle tournerButtonRect = {state->screenWidth/2 + 200, state->screenHeight - 45, 150, 40};
 
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && state->selectedDomino != NULL) {
-			if(CheckCollisionPointRec(mousePoint, tournerButtonRect))
-			{
-				printf("%d\n", state->selectedDomino->v_droite);
-				*state->selectedDomino = tournerDomino(*state->selectedDomino);
-				printf("%d\n", state->selectedDomino->v_droite);
-			}
-				if (CheckCollisionPointRec(mousePoint, playButtonGaucheRect)) {
-				if (verificationPlacement(*state->selectedDomino, state->plateau, true)) {
-					placerDomino_Gauche(*state->selectedDomino, &state->plateau);
-					state->currentPlayer = (state->currentPlayer + 1) % state->playerCount;
-				} else {
-					printf("Placement invalide à gauche !\n");
-				}
-				state->selectedDomino = NULL;  // Désélectionner après le placement
-			}
-			else if (CheckCollisionPointRec(mousePoint, playButtonDroiteRect)) {
-				if (verificationPlacement(*state->selectedDomino, state->plateau, false)) {
-					placerDomino_Droite(*state->selectedDomino, &state->plateau);
-					state->currentPlayer = (state->currentPlayer + 1) % state->playerCount;
-				} else {
-					printf("Placement invalide à droite !\n");
-				}
-				state->selectedDomino = NULL;
-			}
-			
-			else if (CheckCollisionPointRec(mousePoint, passButtonRect)) {
-				printf("Tour terminé. Joueur suivant.\n");
-				state->currentPlayer = (state->currentPlayer + 1) % state->playerCount;
-				state->selectedDomino = NULL;
-				}
-			
+            if (CheckCollisionPointRec(mousePoint, tournerButtonRect)) {
+                printf("Rotation domino: %d|%d -> ", state->selectedDomino->v_droite, state->selectedDomino->v_gauche);
+                *state->selectedDomino = tournerDomino(*state->selectedDomino);
+                printf("%d|%d\n", state->selectedDomino->v_droite, state->selectedDomino->v_gauche);
+            }
+            else if (CheckCollisionPointRec(mousePoint, playButtonGaucheRect)) {
+                if (verificationPlacement(*state->selectedDomino, state->plateau, true)) {
+                    placerDomino_Gauche(*state->selectedDomino, &state->plateau);
+                    supprimerDominoJoueur(&state->players[state->currentPlayer], *state->selectedDomino);
+                    state->currentPlayer = (state->currentPlayer + 1) % state->playerCount;
+                } else {
+                    printf("Placement invalide à gauche !\n");
+                }
+                state->selectedDomino = NULL;
+            }
+            else if (CheckCollisionPointRec(mousePoint, playButtonDroiteRect)) {
+                if (verificationPlacement(*state->selectedDomino, state->plateau, false)) {
+                    placerDomino_Droite(*state->selectedDomino, &state->plateau);
+                    supprimerDominoJoueur(&state->players[state->currentPlayer], *state->selectedDomino);
+                    state->currentPlayer = (state->currentPlayer + 1) % state->playerCount;
+                } else {
+                    printf("Placement invalide à droite !\n");
+                }
+                state->selectedDomino = NULL;
+            }
+        }
+
+        if (state->currentScreen == GAME_TRIOMINO) {
+            Vector2 mousePoint = GetMousePosition();
+            
+            // Gestion de la rotation avec la touche R
+            HandleTriominoRotation(state);
+
+            // Gestion du clic sur le plateau pour placer un triomino
+            if (state->selectedTriomino && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                Rectangle playArea = {50, 100, state->screenWidth - 100, state->screenHeight - 200};
+                if (CheckCollisionPointRec(mousePoint, playArea)) {
+                    if (VerifierPlacementTriomino(state, state->selectedTriomino, mousePoint)) {
+                        PlacerTriomino(state, state->selectedTriomino, mousePoint);
+                        
+                        // Retirer le triomino de la main du joueur
+                        Player *currentPlayer = &state->players[state->currentPlayer];
+                        for (int i = 0; i < currentPlayer->triominoCount; i++) {
+                            if (&currentPlayer->playerTriominos[i] == state->selectedTriomino) {
+                                // Décaler les triominos restants
+                                for (int j = i; j < currentPlayer->triominoCount - 1; j++) {
+                                    currentPlayer->playerTriominos[j] = currentPlayer->playerTriominos[j + 1];
+                                }
+                                currentPlayer->triominoCount--;
+                                break;
+                            }
+                        }
+                        
+                        state->selectedTriomino = NULL;
+                        state->consecutivePasses = 0;
+                        state->currentPlayer = (state->currentPlayer + 1) % state->playerCount;
+                    }
+                }
+            }
+
+            // Gestion du bouton de pioche
+            Rectangle piocherButtonRect = {state->screenWidth/2 + 330, state->screenHeight - 45, 150, 40};
+            if (CheckCollisionPointRec(mousePoint, piocherButtonRect) && 
+                IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && 
+                state->consecutivePasses < 3) {
+                if (TryPiocherTriomino(state, state->currentPlayer)) {
+                    state->consecutivePasses++;
+                    state->currentPlayer = (state->currentPlayer + 1) % state->playerCount;
+                }
+            }
+
+            // Vérification de fin de partie
+            bool gameOver = false;
+            for (int i = 0; i < state->playerCount; i++) {
+                if (state->players[i].triominoCount == 0) {
+                    gameOver = true;
+                    break;
+                }
+            }
+            if (gameOver || state->consecutivePasses >= state->playerCount * 3) {
+                CalculateFinalScores(state);
+                state->currentScreen = SCORES;
+            }
+        }
+
+        if (state->currentScreen == GAME_DOMINO) {
+            // Ajouter la gestion du bouton piocher
+            Rectangle piocherButtonRect = {state->screenWidth/2 + 330, state->screenHeight - 45, 150, 40};
+            if (CheckCollisionPointRec(mousePoint, piocherButtonRect) && 
+                IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                
+                // Vérifier si le joueur peut jouer
+                bool peutJouer = false;
+                Player* currentPlayer = &state->players[state->currentPlayer];
+                
+                for (int i = 0; i < currentPlayer->dominoCount; i++) {
+                    if (verificationPlacement(currentPlayer->playerDominos[i], state->plateau, true) ||
+                        verificationPlacement(currentPlayer->playerDominos[i], state->plateau, false)) {
+                        peutJouer = true;
+                        break;
+                    }
+                }
+                
+                // Si le joueur ne peut pas jouer, il peut piocher
+                if (!peutJouer) {
+                    if (essayerPiocherDomino(state, state->currentPlayer)) {
+                        printf("Domino pioché avec succès\n");
+                    } else {
+                        printf("Plus de dominos dans la pioche\n");
+                        state->currentPlayer = (state->currentPlayer + 1) % state->playerCount;
+                    }
+                }
+            }
         }
     }
+    else if (state->currentScreen == GAME_DOMINO) {
+        // Gérer le tour de l'IA
+        if (state->players[state->currentPlayer].isAI) {
+            if (jouerIA_Domino(state)) {
+                // L'IA a joué avec succès
+                state->currentPlayer = (state->currentPlayer + 1) % state->playerCount;
+            } else {
+                // L'IA n'a pas pu jouer ou a pioché
+                state->currentPlayer = (state->currentPlayer + 1) % state->playerCount;
+            }
+            verifierFinPartie(state);
+            return;
+        }
+
+        // ...rest of the existing game logic...
+        
+        // Ajouter la vérification de fin de partie après chaque coup
+        verifierFinPartie(state);
+    }
 }
+
 void DrawPlayerSetup(GameState *state) {
     ClearBackground(RAYWHITE);
     DrawText("CONFIGURATION DES JOUEURS", 
@@ -775,44 +931,104 @@ void HandleInput(GameState *state) {
         }
     }
 }
-Domino tournerDomino(Domino domino)
-{
-	int temp = domino.v_droite;
-	domino.v_droite = domino.v_gauche;
-	domino.v_gauche = temp;
-	domino.rotation = 180.0f;
-	return domino;
-}
 
 void InitGamePieces(GameState *state) {
-	state->plateau = initialiserPlateau();
-    for (int p = 0; p < state->playerCount; p++) {
-        if (state->selectedGame == 0) {
-            state->players[p].dominoCount = 7;
-            for (int d = 0; d < state->players[p].dominoCount; d++) {
-                state->players[p].playerDominos[d].v_gauche = rand() % 7;
-                state->players[p].playerDominos[d].v_droite = rand() % 7;
+    if (state->selectedGame == 0) {
+        // Initialisation des dominos
+        state->piocheDominos = initialiserDomino();
+        melange_pioche(&state->piocheDominos);
+        
+        // Distribution des dominos aux joueurs
+        DominoNode* joueurs[MAX_PLAYERS] = {NULL};
+        distribuer_piece(&state->piocheDominos, joueurs, state->playerCount);
+        
+        // Conversion des dominos distribués en format de jeu
+        for (int p = 0; p < state->playerCount; p++) {
+            DominoNode* current = joueurs[p];
+            int d = 0;
+            while (current && d < 7) {
+                state->players[p].playerDominos[d] = current->domino_current;
                 state->players[p].playerDominos[d].position = (Vector2){0, 0};
                 state->players[p].playerDominos[d].rotation = 90.0f;
+                current = current->domino_suivant;
+                d++;
             }
-        } else {
-            state->players[p].triominoCount = 7;
-            for (int t = 0; t < state->players[p].triominoCount; t++) {
-                if (t >= state->players[p].triominoCapacity) {
-                    state->players[p].triominoCapacity *= 2;
-                    state->players[p].playerTriominos = realloc(
-                        state->players[p].playerTriominos, 
-                        state->players[p].triominoCapacity * sizeof(Triomino)
-                    );
-                    if (!state->players[p].playerTriominos) {
-                        printf("Memory reallocation error for triominos\n");
-                        exit(-1);
-                    }
-                }
-                InitTriomino(&state->players[p].playerTriominos[t]);
+            state->players[p].dominoCount = d;
+            lib_chaine(joueurs[p]);
+        }
+        // Ne pas libérer la pioche car elle sera utilisée plus tard
+        state->plateau = NULL;
+    } else {
+        // Initialisation des triominos
+        InitTriominoPioche(&state->pioche);
+        MelangerPioche(&state->pioche);
+        
+        // Distribution des triominos
+        int piecesPerPlayer = (state->playerCount == 2) ? 9 : 7;
+        for (int p = 0; p < state->playerCount; p++) {
+            state->players[p].triominoCount = piecesPerPlayer;
+            for (int t = 0; t < piecesPerPlayer; t++) {
+                state->players[p].playerTriominos[t] = PiocherTriomino(&state->pioche);
             }
         }
+        
+        // Initialisation du plateau
+        state->board.pieces = NULL;
+        state->board.count = 0;
+        state->board.positions = NULL;
+        state->currentTurn = 0;
+        state->consecutivePasses = 0;
+        state->gameOver = false;
+    }
+}
+
+void HandleTriominoTurn(GameState *state) {
+    if (state->players[state->currentPlayer].isAI) {
+        if (JouerIA(state, state->currentPlayer)) {
+            state->currentTurn++;
+            state->currentPlayer = (state->currentPlayer + 1) % state->playerCount;
+            state->consecutivePasses = 0;
+        } else {
+            state->consecutivePasses++;
+        }
+    } else {
+        // Gestion du tour du joueur humain
+        // ...existing code...
     }
 
+    // Vérification de fin de partie
+    if (state->consecutivePasses >= state->playerCount) {
+        state->gameOver = true;
+        CalculateFinalScores(state);
+    }
+}
 
+void UpdateGame(GameState *state) {
+    if (state->currentScreen == GAME_DOMINO && state->players[state->currentPlayer].isAI) {
+        static float aiTimer = 0;
+        aiTimer += GetFrameTime();
+        
+        if (aiTimer >= 1.0f) { // Délai d'une seconde
+            printf("Tour de l'IA: %s\n", state->players[state->currentPlayer].name);
+            bool aJoue = jouerIA_Domino(state);
+            
+            if (aJoue) {
+                printf("L'IA a joué avec succès\n");
+                state->currentPlayer = (state->currentPlayer + 1) % state->playerCount;
+            } else {
+                // Si l'IA n'a pas pu jouer, elle essaie de piocher
+                if (essayerPiocherDomino(state, state->currentPlayer)) {
+                    printf("L'IA a pioché un domino\n");
+                } else {
+                    printf("L'IA passe son tour\n");
+                    state->currentPlayer = (state->currentPlayer + 1) % state->playerCount;
+                }
+            }
+            
+            verifierFinPartie(state);
+            aiTimer = 0;
+        }
+    }
+    
+    // ...rest of UpdateGame code...
 }

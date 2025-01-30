@@ -5,6 +5,32 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
+MoveResult verifierPlacementDomino(Domino domino, Plateau *plateau, bool a_gauche) {
+    MoveResult result = {false, 0, ""};
+    
+    if (plateau == NULL) {
+        result.isValid = true;
+        result.score = domino.v_gauche + domino.v_droite;
+        return result;
+    }
+
+    if (a_gauche) {
+        result.isValid = domino.v_droite == plateau->domino.v_gauche;
+    } else {
+        Plateau *actuel = plateau;
+        while (actuel->suivant != NULL) {
+            actuel = actuel->suivant;
+        }
+        result.isValid = domino.v_gauche == actuel->domino.v_droite;
+    }
+    
+    if (result.isValid) {
+        result.score = domino.v_gauche + domino.v_droite;
+    }
+    
+    return result;
+}
+
 bool verificationPlacement(Domino domino_place, Plateau *plateau, bool a_gauche) {
     if (plateau == NULL) {
         return true;

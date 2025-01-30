@@ -1,12 +1,11 @@
 // triomino.c
 #include "triomino.h"
+#include "common_defs.h"
 #include "raymath.h"
 #include <math.h>
 #include <stdio.h>
-
-// Définition des couleurs personnalisées (évitez de redéfinir celles de raylib)
-#define BLACK_TEXT (Color){0, 0, 0, 255}
-#define WHITE_COLOR (Color){255, 255, 255, 255} // Renommez si nécessaire
+#include <stdlib.h>     // Pour rand() et realloc()
+#include <time.h>       // Pour srand()
 
 // Fonction pour obtenir une couleur basée sur la valeur
 Color GetColorByValue(int value) {
@@ -31,6 +30,95 @@ void InitTriomino(Triomino *triomino) {
     triomino->rotation = 0.0f;
     triomino->isRotating = false;
     triomino->rotationSpeed = 90.0f; // 90 degrés par seconde
+}
+
+// Fonction pour initialiser la pioche de triominos
+void InitTriominoPioche(TriominoPioche *pioche) {
+    pioche->count = TOTAL_TRIOMINOS;
+    for(int i = 0; i < TOTAL_TRIOMINOS; i++) {
+        InitTriomino(&pioche->pieces[i]);
+    }
+}
+
+// Fonction pour mélanger la pioche de triominos
+void MelangerPioche(TriominoPioche *pioche) {
+    for(int i = pioche->count - 1; i > 0; i--) {
+        int j = rand() % (i + 1);
+        Triomino temp = pioche->pieces[i];
+        pioche->pieces[i] = pioche->pieces[j];
+        pioche->pieces[j] = temp;
+    }
+}
+
+// Fonction pour piocher un triomino
+Triomino PiocherTriomino(TriominoPioche *pioche) {
+    if(pioche->count <= 0) {
+        // Retourner un triomino invalide ou gérer l'erreur
+        Triomino invalid = {{-1, -1, -1}, {0, 0}, 0, false, 0};
+        return invalid;
+    }
+    
+    pioche->count--;
+    return pioche->pieces[pioche->count];
+}
+
+// Fonction pour calculer les points d'un triomino avec un bonus
+int CalculerPoints(Triomino *triomino, BonusType bonus) {
+    int points = triomino->values[0] + triomino->values[1] + triomino->values[2];
+    
+    switch(bonus) {
+        case BONUS_BRIDGE:
+            points += 40;
+            break;
+        case BONUS_HEXAGON:
+            points += 50;
+            break;
+        case BONUS_DOUBLE_HEXAGON:
+            points += 60;
+            break;
+        case BONUS_TRIPLE_HEXAGON:
+            points += 70;
+            break;
+        default:
+            break;
+    }
+    
+    return points;
+}
+
+// Fonction pour jouer un tour de l'IA
+bool JouerIA(GameState *state, int playerIndex) {
+    Player *ai = &state->players[playerIndex];
+    
+    // Stratégie simple : jouer le premier triomino valide
+    for(int i = 0; i < ai->triominoCount; i++) {
+        Triomino *triomino = &ai->playerTriominos[i];
+        
+        // Chercher une position valide sur le plateau
+        // Pour simplifier, on essaie juste quelques positions prédéfinies
+        Vector2 positions[4] = {
+            {state->screenWidth/2, state->screenHeight/2},
+            {state->screenWidth/2 - TRIOMINO_WIDTH, state->screenHeight/2},
+            {state->screenWidth/2 + TRIOMINO_WIDTH, state->screenHeight/2},
+            {state->screenWidth/2, state->screenHeight/2 + TRIOMINO_HEIGHT}
+        };
+        
+        for(int p = 0; p < 4; p++) {
+            if(VerifierPlacementTriomino(state, triomino, positions[p])) {
+                PlacerTriomino(state, triomino, positions[p]);
+                
+                // Retirer le triomino de la main de l'IA
+                for(int j = i; j < ai->triominoCount - 1; j++) {
+                    ai->playerTriominos[j] = ai->playerTriominos[j + 1];
+                }
+                ai->triominoCount--;
+                
+                return true;
+            }
+        }
+    }
+    
+    return false;
 }
 
 // Fonction pour mettre à jour la rotation d'un triomino
@@ -163,4 +251,353 @@ bool IsPointInTriomino(Vector2 point, Triomino triomino) {
     float area3 = fabs((p3.x - point.x)*(p1.y - point.y) - (p1.x - point.x)*(p3.y - point.y)) / 2.0f;
 
     return fabs(totalArea - (area1 + area2 + area3)) < 0.1f;
+}
+
+bool VerifierPlacementTriomino(GameState *state, Triomino *triomino, Vector2 position) {
+    if (state->board.count == 0) {
+        return true; // Premier triomino peut être placé n'importe où
+    }
+
+    // Vérifier la distance avec les autres triominos
+    for (int i = 0; i < state->board.count; i++) {
+        float distance = Vector2Distance(position, state->board.positions[i]);
+        if (distance < TRIOMINO_WIDTH) {
+            // Vérifier que les valeurs correspondent sur les côtés adjacents
+            Triomino *placedTriomino = &state->board.pieces[i];
+            for (int side1 = 0; side1 < 3; side1++) {
+                for (int side2 = 0; side2 < 3; side2++) {
+                    if (DoTriominosMatch(triomino, placedTriomino, side1, side2)) {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    return false;
+}
+
+BonusType VerifierBonus(GameState *state, Vector2 position) {
+    int adjacentCount = 0;
+    bool formsBridge = false;
+    bool formsHexagon = false;
+    
+    // Compter les triominos adjacents
+    for (int i = 0; i < state->board.count - 1; i++) {
+        float distance = Vector2Distance(position, state->board.positions[i]);
+        if (distance < TRIOMINO_WIDTH * 1.5f) {
+            adjacentCount++;
+            
+            // Vérifier les configurations spéciales
+            if (adjacentCount == 2) formsBridge = true;
+            if (adjacentCount == 6) formsHexagon = true;
+        }
+    }
+    
+    // Déterminer le type de bonus
+    if (formsHexagon) {
+        int hexagonCount = 0;
+        // Compter le nombre d'hexagones déjà formés
+        // Cette partie nécessite une logique plus complexe pour détecter les hexagones multiples
+        switch(hexagonCount) {
+            case 2: return BONUS_DOUBLE_HEXAGON;
+            case 3: return BONUS_TRIPLE_HEXAGON;
+            case 1: return BONUS_HEXAGON;
+            default: break;
+        }
+    }
+    
+    if (formsBridge) return BONUS_BRIDGE;
+    
+    return BONUS_NONE;
+}
+
+void PlacerTriomino(GameState *state, Triomino *triomino, Vector2 position) {
+    // Augmenter la taille des tableaux
+    state->board.count++;
+    state->board.pieces = realloc(state->board.pieces, state->board.count * sizeof(Triomino));
+    state->board.positions = realloc(state->board.positions, state->board.count * sizeof(Vector2));
+    
+    // Ajouter le nouveau triomino
+    state->board.pieces[state->board.count - 1] = *triomino;
+    state->board.positions[state->board.count - 1] = position;
+    
+    // Mettre à jour le score du joueur
+    BonusType bonus = VerifierBonus(state, position);
+    state->players[state->currentPlayer].score += CalculerPoints(triomino, bonus);
+}
+
+void CalculateFinalScores(GameState *state) {
+    // Points bonus pour le joueur qui finit
+    if (state->players[state->currentPlayer].triominoCount == 0) {
+        state->players[state->currentPlayer].score += 25;
+    }
+    
+    // Pénalités pour les triominos restants
+    for (int i = 0; i < state->playerCount; i++) {
+        Player *player = &state->players[i];
+        for (int t = 0; t < player->triominoCount; t++) {
+            int valuesSum = player->playerTriominos[t].values[0] + 
+                          player->playerTriominos[t].values[1] + 
+                          player->playerTriominos[t].values[2];
+            player->score -= valuesSum;
+        }
+    }
+}
+
+void DetectHexagons(GameState *state, Hexagon *hexagons, int *hexagonCount) {
+    *hexagonCount = 0;
+    
+    // Pour chaque triomino sur le plateau
+    for (int i = 0; i < state->board.count; i++) {
+        Vector2 center = state->board.positions[i];
+        int adjacentCount = 0;
+        Vector2 adjacentPositions[6];
+        
+        // Vérifier les triominos adjacents
+        for (int j = 0; j < state->board.count; j++) {
+            if (i == j) continue;
+            
+            float distance = Vector2Distance(center, state->board.positions[j]);
+            if (distance < TRIOMINO_WIDTH * 1.5f) {
+                adjacentPositions[adjacentCount] = state->board.positions[j];
+                adjacentCount++;
+                
+                if (adjacentCount == 6) {
+                    // Hexagone trouvé
+                    hexagons[*hexagonCount].center = center;
+                    hexagons[*hexagonCount].triominoCount = 6;
+                    for (int k = 0; k < 6; k++) {
+                        hexagons[*hexagonCount].positions[k] = adjacentPositions[k];
+                    }
+                    (*hexagonCount)++;
+                }
+            }
+        }
+    }
+}
+
+void HandleTriominoRotation(GameState *state) {
+    if (state->selectedTriomino && IsKeyPressed(KEY_R)) {
+        state->selectedTriomino->rotation += 120.0f; // Rotation de 120° (un tiers de tour)
+        if (state->selectedTriomino->rotation >= 360.0f) {
+            state->selectedTriomino->rotation = 0.0f;
+        }
+        
+        // Faire tourner les valeurs
+        int temp = state->selectedTriomino->values[0];
+        state->selectedTriomino->values[0] = state->selectedTriomino->values[2];
+        state->selectedTriomino->values[2] = state->selectedTriomino->values[1];
+        state->selectedTriomino->values[1] = temp;
+    }
+}
+
+bool TryPiocherTriomino(GameState *state, int playerIndex) {
+    if (state->pioche.count > 0 && state->consecutivePasses < 3) {
+        Triomino newTriomino = PiocherTriomino(&state->pioche);
+        state->players[playerIndex].triominoCount++;
+        state->players[playerIndex].playerTriominos = realloc(
+            state->players[playerIndex].playerTriominos,
+            state->players[playerIndex].triominoCount * sizeof(Triomino)
+        );
+        state->players[playerIndex].playerTriominos[state->players[playerIndex].triominoCount - 1] = newTriomino;
+        
+        // Pénalité de points pour la pioche
+        state->players[playerIndex].score -= 5;
+        return true;
+    }
+    return false;
+}
+
+void UpdateTriominoPositions(GameState *state) {
+    for (int i = 0; i < state->board.count; i++) {
+        // Ajuster la position en fonction de la grille hexagonale
+        float xOffset = (i % 2) * (TRIOMINO_WIDTH * 0.75f);
+        float yOffset = (i / 2) * (TRIOMINO_HEIGHT * 1.5f);
+        
+        state->board.pieces[i].position.x = state->screenWidth/2 + xOffset;
+        state->board.pieces[i].position.y = state->screenHeight/2 + yOffset;
+    }
+}
+
+bool IsValidMove(GameState *state, Vector2 position) {
+    if (state->board.count == 0) return true;
+    
+    // Vérifier la distance avec les autres triominos
+    for (int i = 0; i < state->board.count; i++) {
+        float distance = Vector2Distance(position, state->board.positions[i]);
+        if (distance < TRIOMINO_WIDTH/2) return false; // Trop proche
+        if (distance > TRIOMINO_WIDTH * 2) continue;   // Trop loin
+        
+        // Vérifier l'alignement
+        float angle = atan2(position.y - state->board.positions[i].y,
+                          position.x - state->board.positions[i].x);
+        angle = angle * 180.0f / PI; // Convertir en degrés
+        
+        // Les angles valides sont 0°, 60°, 120°, 180°, 240°, 300°
+        float validAngles[] = {0, 60, 120, 180, 240, 300};
+        for (int j = 0; j < 6; j++) {
+            if (fabs(angle - validAngles[j]) < 10.0f) return true;
+        }
+    }
+    return false;
+}
+
+void UpdateBoardPositions(GameState *state) {
+    if (state->board.count == 0) return;
+    
+    // Calculer le centre du plateau
+    Rectangle playArea = {50, 100, state->screenWidth - 100, state->screenHeight - 200};
+    Vector2 center = {playArea.x + playArea.width/2, playArea.y + playArea.height/2};
+    
+    // Mise à jour des positions
+    for (int i = 0; i < state->board.count; i++) {
+        state->board.pieces[i].position = Vector2Add(state->board.positions[i], center);
+    }
+}
+
+bool CheckTriominoCollisions(GameState *state, Vector2 position) {
+    for (int i = 0; i < state->board.count; i++) {
+        float distance = Vector2Distance(position, state->board.positions[i]);
+        if (distance < TRIOMINO_WIDTH) {
+            return true;  // Collision détectée
+        }
+    }
+    return false;  // Retour par défaut ajouté
+}
+
+Vector2 GetValidTriominoPosition(Vector2 mousePos, Vector2 gridPos) {
+    // Arrondir à la grille la plus proche
+    float gridSize = TRIOMINO_WIDTH;
+    Vector2 snappedPos = {
+        floorf(mousePos.x / gridSize) * gridSize,
+        floorf(mousePos.y / gridSize) * gridSize
+    };
+    return snappedPos;
+}
+
+void UpdatePieceAnimation(PieceAnimation *anim, float deltaTime) {
+    if (!anim->isAnimating) return;
+    
+    anim->progress += deltaTime * ANIMATION_SPEED;
+    if (anim->progress >= 1.0f) {
+        anim->progress = 1.0f;
+        anim->isAnimating = false;
+    }
+}
+
+Vector2 GetSnapPosition(Vector2 mousePos, GameState *state) {
+    Vector2 bestPos = mousePos;
+    float minDist = INFINITY;
+    
+    Rectangle playArea = {50, 100, state->screenWidth - 100, state->screenHeight - 200};
+    
+    // Grille virtuelle
+    float gridSize = TRIOMINO_WIDTH;
+    float x = playArea.x;
+    float y = playArea.y;
+    
+    while (y < playArea.y + playArea.height) {
+        while (x < playArea.x + playArea.width) {
+            Vector2 gridPos = {x, y};
+            float dist = Vector2Distance(mousePos, gridPos);
+            
+            if (dist < minDist && dist < SNAP_DISTANCE && !CheckTriominoCollisions(state, gridPos)) {
+                minDist = dist;
+                bestPos = gridPos;
+            }
+            x += gridSize * 0.75f;
+        }
+        y += gridSize * 0.866f; // √3/2 pour la grille hexagonale
+        x = playArea.x + ((int)(y/gridSize) % 2) * gridSize * 0.5f;
+    }
+    
+    return bestPos;
+}
+
+void ShowPlacementHints(GameState *state) {
+    if (!state->showHints || !state->selectedTriomino) return;
+    
+    Vector2 mousePos = GetMousePosition();
+    Vector2 snapPos = GetSnapPosition(mousePos, state);
+    
+    // Afficher la position possible en transparence
+    Color hintColor = IsValidMove(state, snapPos) ? 
+                     (Color){0, 255, 0, 128} : (Color){255, 0, 0, 128};
+    
+    DrawCircle(snapPos.x, snapPos.y, 5, hintColor);
+}
+
+void HandleAITurn(GameState *state) {
+    if (!state->players[state->currentPlayer].isAI) return;
+    
+    if (JouerIA(state, state->currentPlayer)) {
+        state->currentTurn++;
+        state->currentPlayer = (state->currentPlayer + 1) % state->playerCount;
+        state->consecutivePasses = 0;
+    } else {
+        // Tenter de piocher si possible
+        if (TryPiocherTriomino(state, state->currentPlayer)) {
+            state->consecutivePasses++;
+            state->currentPlayer = (state->currentPlayer + 1) % state->playerCount;
+        } else {
+            // Si on ne peut pas piocher, passer son tour
+            state->consecutivePasses++;
+            state->currentPlayer = (state->currentPlayer + 1) % state->playerCount;
+        }
+    }
+}
+
+void AnimateTriominoPlacement(Triomino *triomino, Vector2 target, float progress) {
+    Vector2 start = triomino->position;
+    triomino->position.x = start.x + (target.x - start.x) * progress;
+    triomino->position.y = start.y + (target.y - start.y) * progress;
+}
+
+void ShowTriominoPlacementHints(GameState *state) {
+    if (!state->selectedTriomino || !state->showHints) return;
+
+    Rectangle playArea = {50, 100, state->screenWidth - 100, state->screenHeight - 200};
+    Vector2 mousePos = GetMousePosition();
+
+    if (CheckCollisionPointRec(mousePos, playArea)) {
+        Vector2 snapPos = GetSnapPosition(mousePos, state);
+        Color hintColor = IsValidMove(state, snapPos) ? 
+                         (Color){0, 255, 0, 128} : 
+                         (Color){255, 0, 0, 128};
+
+        DrawTriangleLines(
+            (Vector2){snapPos.x, snapPos.y},
+            (Vector2){snapPos.x + TRIOMINO_WIDTH, snapPos.y},
+            (Vector2){snapPos.x + TRIOMINO_WIDTH/2, snapPos.y + TRIOMINO_HEIGHT},
+            hintColor
+        );
+    }
+}
+
+// Fonction pour effectuer une rotation d'un triomino
+Triomino rotateTriomino(Triomino t, int rotations) {
+    Triomino result = t;
+    rotations = rotations % 3; // Normaliser le nombre de rotations (0, 1, ou 2)
+    
+    for (int i = 0; i < rotations; i++) {
+        int temp = result.values[0];
+        result.values[0] = result.values[2];
+        result.values[2] = result.values[1];
+        result.values[1] = temp;
+    }
+    
+    return result;
+}
+
+// Fonction pour vérifier si deux triominos sont équivalents (même après rotation)
+bool areTriominosEquivalent(Triomino t1, Triomino t2) {
+    for (int i = 0; i < 3; i++) {
+        if (t1.values[0] == t2.values[0] && 
+            t1.values[1] == t2.values[1] && 
+            t1.values[2] == t2.values[2]) {
+            return true;
+        }
+        t2 = rotateTriomino(t2, 1);
+    }
+    return false;
 }

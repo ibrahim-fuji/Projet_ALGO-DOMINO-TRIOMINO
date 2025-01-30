@@ -1,43 +1,36 @@
 #ifndef DO_H
 #define DO_H
 
-#include "raylib.h"
+#include "common_structs.h"
 
-// Définition de la structure Domino
-/*typedef struct {
-    int v_gauche; // Valeur gauche
-    int v_droite; // Valeur droite
-} Do;*/
+// Forward declaration des structures
+struct GameState;
 
-typedef struct {
-    int v_gauche;
-    int v_droite;
-    Vector2 position;
-    float rotation;
-} Domino;
-
-// Structure pour les nœuds de la liste chaînée de dominos (pioche ou main de joueur)
-typedef struct DominoNode {
-    Domino domino_current;         // Domino actuel
-    struct DominoNode* domino_suivant; // Pointeur vers le domino suivant
-} DominoNode;
-
-// Structure pour représenter une chaîne de dominos sur le plateau
-typedef struct Plateau {
-    Domino domino;         // Domino actuel
-    struct Plateau* suivant;	 // Pointeur vers le domino suivant sur le plateau
-	struct Plateau* precedent;
-} Plateau;
-
-// Prototypes des fonctions
-DominoNode* initialiserDomino();
-Plateau* initialiserPlateau();
+// Prototypes des fonctions uniquement
+DominoNode* initialiserDomino(void);
+Plateau* initialiserPlateau(void);
 DominoNode* supprimerDomino(DominoNode* tete, int v_gauche, int v_droite);
 void afficherDomino(DominoNode* tete);
 void afficherPlateau(Plateau* plateau);
 void melange_pioche(DominoNode** tete);
-void distribuer_piece(DominoNode** pioche, DominoNode** joueurs, int nb_joueurs);
-void afficherchaineDomino(DominoNode* chaine);
+void distribuer_piece(DominoNode** pioche, DominoNode* joueurs[], int nb_joueurs);
 void lib_chaine(DominoNode* chaine);
+Domino tournerDomino(Domino domino);
+void supprimerDominoJoueur(Player* player, Domino domino);
+bool dominosEgaux(Domino d1, Domino d2);
+DominoNode* piocherDomino(DominoNode** pioche);
+bool essayerPiocherDomino(struct GameState* state, int playerIndex);
 
-#endif // DOMINO_H
+// Fonctions pour l'IA et le score
+bool jouerIA_Domino(struct GameState* state);
+int calculerScore(Plateau* plateau);
+void verifierFinPartie(struct GameState* state);
+bool peutJouerDomino(Player* player, Plateau* plateau);
+
+// Nouvelles fonctions pour l'IA et le score
+int evaluerCoupDomino(Domino domino, Plateau* plateau, bool aGauche);
+Domino* trouverMeilleurCoup(Player* ai, Plateau* plateau, bool* aGauche);
+int calculerScoreMain(Player* player);
+void ajouterPointsPlateau(struct GameState* state, int playerIndex);
+
+#endif // DO_H

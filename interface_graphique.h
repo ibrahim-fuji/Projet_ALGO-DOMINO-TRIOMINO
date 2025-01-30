@@ -4,6 +4,7 @@
 
 #include "game_state.h"
 #include "raylib.h"
+#include "domino.h"  // Add this include for DrawDominoHighlight
 
 // Déclarations des fonctions
 void DrawMainMenu(GameState *state);
@@ -16,5 +17,11 @@ void HandlePlayerInput(GameState *state);
 void DrawDominoInChevalet(GameState *state, int playerIndex, int dominoIndex);
 void DrawTriominoInChevalet(GameState *state, int playerIndex, int triominoIndex);
 void InitGamePieces(GameState *state);
+void DrawTriominoPlateau(GameState *state);
+void UpdateTriominoPositions(GameState *state);
+
+// Add these declarations
+void UpdateDominoGame(GameState *state);
+void UpdateTriominoGame(GameState *state);
 
 #endif // INTERFACE_GRAPHIQUE_H

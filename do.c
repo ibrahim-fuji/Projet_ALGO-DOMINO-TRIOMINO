@@ -1,7 +1,9 @@
 #include "do.h"
+#include "joueurs.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include "game_state.h"  // Ajout de l'inclusion pour GameState
 
 DominoNode* initialiserDomino() {
     DominoNode *tete = NULL;
@@ -64,7 +66,7 @@ void afficherPlateau(Plateau *plateau) {
 }
 void melange_pioche(DominoNode** tete) {
     if (tete == NULL || *tete == NULL) {
-        return; // Rien à mélanger si la pioche est vide
+        return; // Rien ï¿½ mï¿½langer si la pioche est vide
     }
 
     int n = 0;
@@ -79,7 +81,7 @@ void melange_pioche(DominoNode** tete) {
     // Stocker les adresses des dominos dans un tableau
     DominoNode** tableau = (DominoNode**)malloc(n * sizeof(DominoNode*));
     if (tableau == NULL) {
-        return; // Erreur d'allocation mémoire
+        return; // Erreur d'allocation mï¿½moire
     }
 
     tmp = *tete;
@@ -88,7 +90,7 @@ void melange_pioche(DominoNode** tete) {
         tmp = tmp->domino_suivant;
     }
 
-    // Mélanger le tableau avec l'algorithme de Fisher-Yates
+    // Mï¿½langer le tableau avec l'algorithme de Fisher-Yates
     srand(time(NULL));
     for (int i = n - 1; i > 0; i--) {
         int j = rand() % (i + 1);
@@ -97,13 +99,13 @@ void melange_pioche(DominoNode** tete) {
         tableau[j] = temp;
     }
 
-    // Recréer la liste chaînée mélangée
+    // Recrï¿½er la liste chaï¿½nï¿½e mï¿½langï¿½e
     for (int i = 0; i < n - 1; i++) {
         tableau[i]->domino_suivant = tableau[i + 1];
     }
     tableau[n - 1]->domino_suivant = NULL;
 
-    // Mettre à jour la tête de la pioche
+    // Mettre ï¿½ jour la tï¿½te de la pioche
     *tete = tableau[0];
 
     free(tableau);
@@ -144,7 +146,7 @@ void melange_pioche(DominoNode** tete) {
 //}
 void distribuer_piece(DominoNode** pioche, DominoNode* joueurs[], int nb_joueurs) {
     if (pioche == NULL || *pioche == NULL || joueurs == NULL) {
-        fprintf(stderr, "Erreur: Paramètres invalides pour la distribution des pièces\n");
+        fprintf(stderr, "Erreur: Paramï¿½tres invalides pour la distribution des piï¿½ces\n");
         return;
     }
 
@@ -220,4 +222,277 @@ void lib_chaine(DominoNode* chaine) {
         chaine = chaine->domino_suivant;
         free(tmp);
     }
+}
+
+Domino tournerDomino(Domino domino) {
+    Domino resultat = domino;
+    
+    // Ã‰changer les valeurs
+    int temp = resultat.v_droite;
+    resultat.v_droite = resultat.v_gauche;
+    resultat.v_gauche = temp;
+    
+    // Mettre Ã  jour la rotation physique
+    resultat.rotation += 180.0f;
+    if (resultat.rotation >= 360.0f) {
+        resultat.rotation -= 360.0f;
+    }
+    
+    return resultat;
+}
+
+bool dominosEgaux(Domino d1, Domino d2) {
+    return (d1.v_gauche == d2.v_gauche && d1.v_droite == d2.v_droite) ||
+           (d1.v_gauche == d2.v_droite && d1.v_droite == d2.v_gauche);
+}
+
+void supprimerDominoJoueur(Player* player, Domino domino) {
+    int indexASupprimer = -1;
+    
+    // Chercher le domino Ã  supprimer
+    for (int i = 0; i < player->dominoCount; i++) {
+        if (dominosEgaux(player->playerDominos[i], domino)) {
+            indexASupprimer = i;
+            break;
+        }
+    }
+    
+    // Si le domino a Ã©tÃ© trouvÃ©, le supprimer
+    if (indexASupprimer >= 0) {
+        // DÃ©caler tous les dominos suivants
+        for (int i = indexASupprimer; i < player->dominoCount - 1; i++) {
+            player->playerDominos[i] = player->playerDominos[i + 1];
+        }
+        player->dominoCount--;
+    }
+}
+
+DominoNode* piocherDomino(DominoNode** pioche) {
+    if (pioche == NULL || *pioche == NULL) {
+        return NULL;
+    }
+
+    DominoNode* nouveau = *pioche;
+    *pioche = (*pioche)->domino_suivant;
+    nouveau->domino_suivant = NULL;
+    return nouveau;
+}
+
+bool essayerPiocherDomino(GameState* state, int playerIndex) {
+    if (state->piocheDominos == NULL) {
+        return false;
+    }
+
+    DominoNode* nouveauDomino = piocherDomino(&state->piocheDominos);
+    if (nouveauDomino == NULL) {
+        return false;
+    }
+
+    Player* player = &state->players[playerIndex];
+    if (player->dominoCount < 7) {
+        player->playerDominos[player->dominoCount] = nouveauDomino->domino_current;
+        player->playerDominos[player->dominoCount].position = (Vector2){0, 0};
+        player->playerDominos[player->dominoCount].rotation = 90.0f;
+        player->dominoCount++;
+        free(nouveauDomino);
+        return true;
+    }
+
+    free(nouveauDomino);
+    return false;
+}
+
+int evaluerCoupDomino(Domino domino, Plateau* plateau, bool aGauche) {
+    int score = 0;
+    
+    // Points de base pour les valeurs du domino
+    score += domino.v_gauche + domino.v_droite;
+    
+    // Bonus pour les doubles
+    if (domino.v_gauche == domino.v_droite) {
+        score += 10;
+    }
+    
+    // Bonus pour les connections parfaites
+    if (plateau != NULL) {
+        if (aGauche) {
+            if (plateau->domino.v_gauche == domino.v_droite) {
+                score += 15;
+            }
+        } else {
+            Plateau* dernierDomino = plateau;
+            while (dernierDomino->suivant != NULL) {
+                dernierDomino = dernierDomino->suivant;
+            }
+            if (dernierDomino->domino.v_droite == domino.v_gauche) {
+                score += 15;
+            }
+        }
+    }
+    
+    return score;
+}
+
+bool jouerIA_Domino(GameState* state) {
+    if (!state->players[state->currentPlayer].isAI) return false;
+    
+    Player* ai = &state->players[state->currentPlayer];
+    
+    // Premier domino au plateau
+    if (state->plateau == NULL && ai->dominoCount > 0) {
+        // Jouer le premier domino disponible
+        placerDomino_Gauche(ai->playerDominos[0], &state->plateau);
+        supprimerDominoJoueur(ai, ai->playerDominos[0]);
+        return true;
+    }
+    
+    // Trouver le meilleur coup
+    int meilleurScore = -1;
+    int meilleurIndex = -1;
+    bool placerAGauche = false;
+    
+    // Ã‰valuer chaque domino
+    for (int i = 0; i < ai->dominoCount; i++) {
+        // Essayer Ã  gauche
+        if (verificationPlacement(ai->playerDominos[i], state->plateau, true)) {
+            int score = evaluerCoupDomino(ai->playerDominos[i], state->plateau, true);
+            if (score > meilleurScore) {
+                meilleurScore = score;
+                meilleurIndex = i;
+                placerAGauche = true;
+            }
+        }
+        
+        // Essayer Ã  droite
+        if (verificationPlacement(ai->playerDominos[i], state->plateau, false)) {
+            int score = evaluerCoupDomino(ai->playerDominos[i], state->plateau, false);
+            if (score > meilleurScore) {
+                meilleurScore = score;
+                meilleurIndex = i;
+                placerAGauche = false;
+            }
+        }
+    }
+    
+    // Jouer le meilleur coup trouvÃ©
+    if (meilleurIndex >= 0) {
+        Domino dominoAJouer = ai->playerDominos[meilleurIndex];
+        
+        if (placerAGauche) {
+            placerDomino_Gauche(dominoAJouer, &state->plateau);
+        } else {
+            placerDomino_Droite(dominoAJouer, &state->plateau);
+        }
+        
+        supprimerDominoJoueur(ai, dominoAJouer);
+        printf("L'IA a jouÃ© le domino [%d|%d] Ã  %s\n", 
+               dominoAJouer.v_gauche, 
+               dominoAJouer.v_droite, 
+               placerAGauche ? "gauche" : "droite");
+        return true;
+    }
+    
+    // Si aucun coup possible, essayer de piocher
+    if (essayerPiocherDomino(state, state->currentPlayer)) {
+        printf("L'IA a piochÃ© un domino\n");
+    }
+    return false;
+}
+
+int calculerScoreMain(Player* player) {
+    int score = 0;
+    for (int i = 0; i < player->dominoCount; i++) {
+        score += player->playerDominos[i].v_gauche + player->playerDominos[i].v_droite;
+    }
+    return score;
+}
+
+void ajouterPointsPlateau(GameState* state, int playerIndex) {
+    // Ajouter les points du plateau
+    int scoreTotal = calculerScore(state->plateau);
+    printf("Points du plateau: %d\n", scoreTotal);
+    
+    // Ajouter bonus pour avoir fini
+    if (state->players[playerIndex].dominoCount == 0) {
+        scoreTotal += 25;
+        printf("Bonus de fin: +25\n");
+    }
+    
+    state->players[playerIndex].score += scoreTotal;
+}
+
+void verifierFinPartie(GameState* state) {
+    bool partieTerminee = false;
+    int gagnantIndex = -1;
+    
+    // VÃ©rifier si un joueur n'a plus de dominos
+    for (int i = 0; i < state->playerCount; i++) {
+        if (state->players[i].dominoCount == 0) {
+            partieTerminee = true;
+            gagnantIndex = i;
+            break;
+        }
+    }
+    
+    // VÃ©rifier si la partie est bloquÃ©e
+    if (!partieTerminee) {
+        bool bloque = true;
+        for (int i = 0; i < state->playerCount; i++) {
+            if (peutJouerDomino(&state->players[i], state->plateau)) {
+                bloque = false;
+                break;
+            }
+        }
+        if (bloque && state->piocheDominos == NULL) {
+            partieTerminee = true;
+            
+            // Trouver le joueur avec le moins de points dans sa main
+            int minScore = INT_MAX;
+            for (int i = 0; i < state->playerCount; i++) {
+                int scoreMain = calculerScoreMain(&state->players[i]);
+                if (scoreMain < minScore) {
+                    minScore = scoreMain;
+                    gagnantIndex = i;
+                }
+            }
+        }
+    }
+    
+    if (partieTerminee) {
+        // Appliquer les pÃ©nalitÃ©s pour les dominos restants
+        for (int i = 0; i < state->playerCount; i++) {
+            int penalite = calculerScoreMain(&state->players[i]);
+            state->players[i].score -= penalite;
+            printf("PÃ©nalitÃ© joueur %d: -%d\n", i + 1, penalite);
+        }
+        
+        // Ajouter les points au gagnant
+        if (gagnantIndex >= 0) {
+            ajouterPointsPlateau(state, gagnantIndex);
+        }
+        
+        state->currentScreen = SCORES;
+    }
+}
+
+bool peutJouerDomino(Player* player, Plateau* plateau) {
+    for (int i = 0; i < player->dominoCount; i++) {
+        if (verificationPlacement(player->playerDominos[i], plateau, true) ||
+            verificationPlacement(player->playerDominos[i], plateau, false)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+int calculerScore(Plateau* plateau) {
+    int score = 0;
+    Plateau* current = plateau;
+    
+    while (current != NULL) {
+        score += current->domino.v_gauche + current->domino.v_droite;
+        current = current->suivant;
+    }
+    
+    return score;
 }

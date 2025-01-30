@@ -1,6 +1,7 @@
 // domino.c
 #include "domino.h"
 #include "game_state.h"
+#include "joueurs.h"
 #include <math.h>
 
 // Function to draw a custom button and handle interactions
@@ -88,4 +89,36 @@ void DrawDomino(Domino domino) {
     // Draw the dots
     DrawDominoFace(domino.position.x, domino.position.y, domino.v_gauche, halfWidth, DOMINO_HEIGHT);
     DrawDominoFace(domino.position.x + halfWidth, domino.position.y, domino.v_droite, halfWidth, DOMINO_HEIGHT);
+}
+
+void DrawDominoHighlight(Domino *domino, Color color) {
+    Rectangle bounds = {
+        domino->position.x - 2,
+        domino->position.y - 2,
+        DOMINO_WIDTH + 4,
+        DOMINO_HEIGHT + 4
+    };
+    DrawRectangleLinesEx(bounds, 2, color);
+}
+
+void UpdateDominoPlacement(GameState *state, Vector2 mousePos) {
+    if (!state->selectedDomino) return;
+
+    Rectangle plateauRect = {
+        state->screenWidth/2 - 300,
+        state->screenHeight/2 - 100,
+        600,
+        200
+    };
+
+    if (CheckCollisionPointRec(mousePos, plateauRect)) {
+        MoveResult leftResult = verifierPlacementDomino(*state->selectedDomino, state->plateau, true);
+        MoveResult rightResult = verifierPlacementDomino(*state->selectedDomino, state->plateau, false);
+
+        if (leftResult.isValid || rightResult.isValid) {
+            DrawDominoHighlight(state->selectedDomino, GREEN);
+        } else {
+            DrawDominoHighlight(state->selectedDomino, RED);
+        }
+    }
 }

@@ -1,55 +1,13 @@
 #ifndef GAME_STATE_H
 #define GAME_STATE_H
 
-#include "raylib.h"
-#include <stdbool.h>
-#include <stdlib.h>
-#include "do.h" 
-#include "joueurs.h"
+#include "common_defs.h"
+#include "common_structs.h"
 
-// Définition des constantes pour les dimensions
-#define DOMINO_WIDTH 50
-#define DOMINO_HEIGHT 40
-#define TRIOMINO_WIDTH 60
-#define TRIOMINO_HEIGHT 52
-#define TRIOMINO_DOT_RADIUS 3
-#define DOTS_RADIUS 3
-#define MAX_INPUT_LENGTH 20
-#define MAX_PLAYERS 4
-#define PANEL_PADDING 20
+// Forward declaration
+typedef struct GameState GameState;
 
-// Structure pour le chevalet
-typedef struct {
-    Rectangle bounds;
-    Color color;
-} Chevalet;
-
-// Structure pour représenter un domino
-
-
-// Structure pour un triomino
-typedef struct {
-    int values[3];
-    Vector2 position;
-    float rotation;
-    bool isRotating;
-    float rotationSpeed;
-} Triomino;
-
-// Structure pour représenter un joueur
-typedef struct {
-    char name[MAX_INPUT_LENGTH];
-    int score;
-    bool isAI;
-    Domino playerDominos[7];
-    int dominoCount;
-    Triomino *playerTriominos;
-    int triominoCount;
-    int triominoCapacity;
-    Chevalet chevalet;
-} Player;
-
-// Enumération des différents écrans du jeu
+// Enumération des écrans
 typedef enum {
     MENU,
     GAME_SELECTION,
@@ -59,8 +17,16 @@ typedef enum {
     SCORES
 } GameScreen;
 
+// Ajout des états de jeu
+typedef enum {
+    STATE_SELECTING,
+    STATE_PIECE_SELECTED,
+    STATE_ANIMATING,
+    STATE_PLACING
+} GamePlayState;
+
 // Structure de l'état du jeu
-typedef struct {
+struct GameState {
     GameScreen currentScreen;
     char inputText[MAX_INPUT_LENGTH];
     int playerCount;
@@ -75,12 +41,24 @@ typedef struct {
     bool isFullscreen;
     Plateau *plateau;
     Domino *selectedDomino;
-} GameState;
+    TriominoPioche pioche;
+    TriominoBoard board;
+    int currentTurn;
+    int consecutivePasses;
+    bool gameOver;
+    GamePlayState playState;
+    float deltaTime;
+    bool showHints;
+    Vector2 lastValidPosition;
+    ErrorLog errors;
+    bool isInitialized;
+    DominoNode* piocheDominos;  // Ajouter ce champ
+};
 
-// Fonctions de calcul des dimensions adaptatives
-float GetDominoWidth(GameState *state);
-float GetDominoHeight(GameState *state);
-float GetTriominoWidth(GameState *state);
-float GetTriominoHeight(GameState *state);
+// Prototypes des fonctions
+void CalculateFinalScores(GameState *state);
+void HandleTriominoTurn(GameState *state);
+bool VerifierPlacementTriomino(GameState *state, Triomino *triomino, Vector2 position);
+void PlacerTriomino(GameState *state, Triomino *triomino, Vector2 position);
 
 #endif // GAME_STATE_H
